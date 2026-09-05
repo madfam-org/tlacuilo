@@ -73,8 +73,16 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build (no push)
         run: docker build -t tlacuilo:ci . && docker build -t tlacuilo-web:ci -f web/Dockerfile .
-      - name: Smoke the image
+      - name: Smoke the images under the pod's restrictions
+        # Same posture as the Deployments: non-root, all capabilities dropped, no new
+        # privileges, read-only root. A binary with file capabilities fails here
+        # exactly as it fails in the cluster (the Caddy lesson, 2026-09-05).
         run: |
-          docker run --rm tlacuilo:ci python -c "import tlacuilo, tlacuilo.api; print('import ok', tlacuilo.__version__)"
-          docker run --rm tlacuilo:ci tesseract --version | head -1
-          docker run --rm tlacuilo-web:ci caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+          H="--user 1001 --cap-drop ALL --security-opt no-new-privileges --read-only"
+          docker run --rm $H --tmpfs /tmp tlacuilo:ci python -c "import tlacuilo, tlacuilo.api; print('import ok', tlacuilo.__version__)"
+          docker run --rm $H --tmpfs /tmp tlacuilo:ci tesseract --version | head -1
+          docker run --rm $H --tmpfs /data --tmpfs /config tlacuilo-web:ci caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+          docker run -d --name web $H --tmpfs /data --tmpfs /config -p 18080:8080 tlacuilo-web:ci
+          for i in $(seq 1 20); do curl -fsS http://127.0.0.1:18080/health && break || sleep 1; done
+          curl -fsS -o /dev/null http://127.0.0.1:18080/ && echo "landing serves"
+          docker rm -f web
