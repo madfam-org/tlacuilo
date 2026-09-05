@@ -1,0 +1,36 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: tlacuilo-stability
+  namespace: tlacuilo
+  labels:
+    app: tlacuilo
+spec:
+  groups:
+    - name: tlacuilo
+      rules:
+        - alert: TlacuiloApiDown
+          expr: up{namespace="tlacuilo", job=~".*tlacuilo.*"} == 0
+          for: 5m
+          labels:
+            severity: warning
+            service: tlacuilo
+          annotations:
+            summary: tlacuilo API target down for 5m
+            runbook: internal-devops rfcs/0040-tlacuilo-document-intelligence-ocr-service.md
+        - alert: TlacuiloExtractionErrors
+          expr: increase(tlacuilo_extractions_total{outcome="error"}[15m]) > 5
+          for: 0m
+          labels:
+            severity: warning
+            service: tlacuilo
+          annotations:
+            summary: more than 5 failed extractions in 15m (fail-closed by design; check engines and inputs)
+        - alert: TlacuiloStatementMismatches
+          expr: increase(tlacuilo_validation_total{result="mismatch"}[1h]) > increase(tlacuilo_validation_total{result="reconciles"}[1h])
+          for: 30m
+          labels:
+            severity: warning
+            service: tlacuilo
+          annotations:
+            summary: more statements fail reconciliation than pass over the last hour — a parser or layout regression

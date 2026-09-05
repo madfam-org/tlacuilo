@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tlacuilo — inteligencia documental del ecosistema MADFAM</title>
+<meta name="description" content="tlacuilo lee documentos (estados de cuenta, recibos, constancias) y devuelve datos tipados con confianza por campo. Sin retención, sin nubes de terceros. Código abierto AGPL-3.0.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%231f3d2b'/%3E%3Cpath d='M18 44 L46 16 M18 20 L46 48' stroke='%23e9d8a6' stroke-width='6' stroke-linecap='round'/%3E%3C/svg%3E">
+<style>
+  :root { --bg:#f7f5ef; --ink:#1c1b18; --muted:#5b5a55; --line:#dcd7c9; --accent:#1f3d2b; --accent-ink:#e9d8a6; --card:#ffffff; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#14161a; --ink:#ece9e0; --muted:#a8a59b; --line:#2b2f36; --accent:#9fcbb0; --accent-ink:#0f1a14; --card:#1b1e24; } }
+  * { box-sizing:border-box }
+  html { color-scheme: light dark }
+  body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; }
+  a { color:inherit }
+  .skip { position:absolute; left:-999px } .skip:focus { left:1rem; top:1rem; background:var(--card); padding:.5rem 1rem; z-index:9 }
+  header, main, footer { max-width:60rem; margin:0 auto; padding:0 1.25rem }
+  header { padding-top:2.5rem; display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap }
+  .brand { font-weight:700; letter-spacing:.02em; font-size:1.25rem }
+  .brand small { display:block; font-weight:400; color:var(--muted); font-size:.85rem }
+  nav a { margin-left:1rem; text-decoration:none; color:var(--muted) } nav a:hover, nav a:focus { color:var(--ink); text-decoration:underline }
+  .hero { padding:3.5rem 0 2.5rem; border-bottom:1px solid var(--line) }
+  .hero h1 { font-size:clamp(1.9rem, 4vw, 2.8rem); line-height:1.15; margin:0 0 1rem; max-width:34ch }
+  .hero p { font-size:1.125rem; max-width:60ch; color:var(--muted) }
+  .pill { display:inline-block; padding:.2rem .7rem; border:1px solid var(--line); border-radius:999px; font-size:.8rem; color:var(--muted); margin-bottom:1rem }
+  section { padding:2.5rem 0; border-bottom:1px solid var(--line) }
+  h2 { font-size:1.4rem; margin:0 0 1rem }
+  .grid { display:grid; gap:1rem; grid-template-columns:repeat(auto-fit, minmax(15rem, 1fr)) }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:1.1rem 1.2rem }
+  .card h3 { margin:0 0 .4rem; font-size:1.05rem }
+  .card p { margin:0; color:var(--muted); font-size:.95rem }
+  pre { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:1rem; overflow-x:auto; font-size:.85rem; line-height:1.45 }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace }
+  .cta { display:inline-block; background:var(--accent); color:var(--accent-ink); padding:.7rem 1.1rem; border-radius:10px; text-decoration:none; font-weight:600 }
+  .cta:focus-visible, a:focus-visible { outline:3px solid var(--accent); outline-offset:3px }
+  footer { padding:2rem 1.25rem 3rem; color:var(--muted); font-size:.9rem }
+  ul.plain { padding-left:1.2rem } ul.plain li { margin:.35rem 0 }
+  .en { border-left:3px solid var(--line); padding-left:1rem; color:var(--muted) }
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Saltar al contenido</a>
+<header>
+  <div class="brand">tlacuilo<small>inteligencia documental · MADFAM</small></div>
+  <nav aria-label="Secciones"><a href="#que-hace">Qué hace</a><a href="#doctrina">Doctrina</a><a href="#contrato">Contrato</a><a href="#estado">Estado</a><a href="https://github.com/madfam-org/tlacuilo">Código</a></nav>
+</header>
+<main id="main">
+  <section class="hero" aria-labelledby="h1">
+    <span class="pill">M0 · en construcción · AGPL-3.0</span>
+    <h1 id="h1">Lee estados de cuenta, recibos y constancias, y devuelve datos con nombre, confianza y evidencia.</h1>
+    <p>tlacuilo es el servicio de OCR y extracción tipada del ecosistema MADFAM. Recibe un documento, lo clasifica, extrae su texto o lo lee con OCR, entiende la tabla y entrega un resultado versionado donde cada renglón trae su confianza, su página y su posición. No guarda nada: los bytes viven en memoria durante un trabajo y los originales se quedan con quien los envió.</p>
+    <p class="en">In English: tlacuilo is MADFAM's document-intelligence service — OCR plus typed extraction that keeps nothing durable, scores every field, and never sends a restricted document to a third-party cloud. Named after the Nahuatl codex scribe.</p>
+  </section>
+
+  <section id="que-hace" aria-labelledby="h-que">
+    <h2 id="h-que">Qué hace</h2>
+    <div class="grid">
+      <div class="card"><h3>Estados de cuenta bancarios</h3><p>Primero México: BBVA, Citibanamex, Santander, Banorte, HSBC y después el resto. Cada banco tiene su propio parser con huella de layout y pruebas.</p></div>
+      <div class="card"><h3>Conciliación aritmética</h3><p>Saldo inicial más cada movimiento debe dar el saldo final. Ese es el único campo con el que un consumidor puede registrar movimientos sin revisión humana.</p></div>
+      <div class="card"><h3>Recibos, CFDI en PDF, CSF, opinión 32-D</h3><p>Los documentos fiscales que Karafiel ya lee con parsers de texto migran aquí con sus mismas pruebas de regresión.</p></div>
+      <div class="card"><h3>Pasaportes y formularios escaneados</h3><p>Zona de lectura mecánica (ICAO 9303) para Meridian; formularios firmados para expedientes clínicos. Fases posteriores.</p></div>
+    </div>
+  </section>
+
+  <section id="doctrina" aria-labelledby="h-doc">
+    <h2 id="h-doc">Cuatro reglas que no se negocian</h2>
+    <ul class="plain">
+      <li><strong>Nada persiste.</strong> Solo metadatos de trabajo (identificadores, hashes, tamaños, tiempos). Ni texto, ni campos, ni bytes. Las filas caducan.</li>
+      <li><strong>Un solo camino a los modelos.</strong> Toda inferencia pasa por Selva con la sensibilidad declarada por quien llama; un documento <em>restringido</em> nunca sale a una nube de terceros. Sin llaves de proveedor, sin OCR hospedado.</li>
+      <li><strong>La API vive dentro del clúster.</strong> Solo los servicios autorizados la alcanzan. Esta página es lo único público.</li>
+      <li><strong>Falla cerrado, nunca inventa.</strong> Un documento ilegible es un error con código. Un resultado que no concilia sigue siendo un resultado, marcado para revisión.</li>
+    </ul>
+  </section>
+
+  <section id="contrato" aria-labelledby="h-con">
+    <h2 id="h-con">El contrato <code>document-extraction/v1</code></h2>
+    <p>Un resultado lleva el documento (tipo, páginas, hash, clasificación), la procedencia (motores, parser, tiempos), el estado de cuenta tipado y un bloque de validación.</p>
+<pre><code>{
+  "contract": "document-extraction/v1",
+  "document":   { "type": "bank_statement", "pages": 6, "sha256": "…", "classification": "restricted" },
+  "provenance": { "engines": { "text": "pdfplumber 0.11" }, "parser": "mx.generic.table.v1", "durationMs": 2140 },
+  "statement":  { "bank": "BBVA", "accountLast4": "1234", "currency": "MXN",
+                  "openingBalance": 15230.55, "closingBalance": 12988.10,
+                  "transactions": [ { "seq": 1, "date": "2026-07-02", "description": "SPEI RECIBIDO …",
+                                      "amount": 2500.00, "balanceAfter": 17730.55,
+                                      "confidence": 0.98, "page": 2, "bbox": [72.0, 410.2, 540.0, 424.9] } ] },
+  "validation": { "balanceReconciles": true, "unparsedLines": 0, "warnings": [] }
+}</code></pre>
+  </section>
+
+  <section id="estado" aria-labelledby="h-est">
+    <h2 id="h-est">Estado</h2>
+    <div class="grid">
+      <div class="card"><h3>M0 — andamiaje</h3><p>PDF con capa de texto, parser genérico de tablas, huellas de banco, validación por saldo, generador de estados sintéticos con verdad conocida. En curso.</p></div>
+      <div class="card"><h3>M1 — bancos mexicanos</h3><p>Un parser por banco y versión de layout, carril de OCR para escaneos, corpus sintético en CI.</p></div>
+      <div class="card"><h3>M2 — integración con Dhanam</h3><p>Estados de cuenta al libro mayor con conciliación como compuerta; prueba de fuego con miles de estados.</p></div>
+      <div class="card"><h3>M3–M4</h3><p>Carril de visión local vía Selva, documentos fiscales de Karafiel, pasaportes y formularios.</p></div>
+    </div>
+    <p style="margin-top:1.5rem"><a class="cta" href="https://github.com/madfam-org/tlacuilo">Ver el código en GitHub</a></p>
+  </section>
+</main>
+<footer>
+  <p>tlacuilo es software libre bajo la licencia <a href="https://www.gnu.org/licenses/agpl-3.0.html">GNU AGPL-3.0</a>. Parte del ecosistema <a href="https://madfam.io">MADFAM</a>. Esta página no usa cookies ni recopila datos.</p>
+</footer>
+</body>
+</html>

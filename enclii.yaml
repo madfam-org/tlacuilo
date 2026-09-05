@@ -1,0 +1,144 @@
+# Enclii manifest — tlacuilo, the MADFAM document-intelligence service (RFC 0040).
+#
+# Two services. `tlacuilo` (the API) is in-cluster ONLY: no `domains:` block on
+# purpose; consumers reach `tlacuilo.tlacuilo.svc.cluster.local:80` and the
+# NetworkPolicies admit only their namespaces. `tlacuilo-web` is the landing at
+# tlacuilo.madfam.io (umbrella pattern, one label below the apex) — the single
+# public surface, ruled 2026-09-05 together with "substrate, not a SKU".
+#
+# Managed Postgres is provisioned AT onboard (onboard is not idempotent); it
+# holds job metadata only — ids, hashes, sizes, timings — never document
+# content. Every onboard gotcha in internal-devops
+# reference_enclii_onboard_gotchas applies (service name == K8s Service name,
+# port 80, enclii.dev/v1 schema, network block present).
+apiVersion: enclii.dev/v1
+kind: Project
+metadata:
+  name: tlacuilo
+spec:
+  # Manual promotion: this service reads other organizations' bank statements.
+  # A bad promote is a data-handling event, not a cosmetic one.
+  promotion:
+    pattern: manual
+    min_soak_minutes: 15
+    require_smoke_pass: true
+---
+apiVersion: enclii.dev/v1
+kind: Service
+metadata:
+  name: tlacuilo
+  project: tlacuilo
+  description: tlacuilo — document intelligence (OCR + typed extraction), nothing durable, Selva-only inference
+spec:
+  # No public surface, so no status-page probe until productized.
+  status:
+    enabled: false
+    entries: []
+
+  build:
+    type: dockerfile
+    dockerfile: Dockerfile
+    context: .
+    source:
+      git:
+        repository: https://github.com/madfam-org/tlacuilo
+        branch: main
+        autoDeploy: true
+
+  runtime:
+    port: 8000
+    replicas: 1
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "256Mi"
+      limits:
+        cpu: "1000m"
+        memory: "1Gi"
+    healthCheck: /health
+    healthCheckTimeoutSeconds: 3
+
+  addons:
+    - type: postgres
+      name: tlacuilo-db
+
+  slo:
+    availability: 99.5
+    latencyP99Ms: 5000
+
+  # No cloudflare-tunnel ingress: the consumer allowlist lives in
+  # infra/k8s/production/network-policies.yaml. `selva` egress is the only path
+  # any document pixel ever takes to a model (M3), and `https` exists solely so
+  # the worker can fetch a caller's short-lived presigned R2 URL.
+  network:
+    services:
+      - name: tlacuilo
+        port: 8000
+        egress: [dns, postgres, redis, selva, https]
+      - name: tlacuilo-worker
+        port: 0
+        egress: [dns, postgres, redis, selva, https]
+
+  dependencies:
+    - platform: janua
+      reason: identity — RS256 service-client JWTs (role tlacuilo:extract), no users of its own
+    - platform: selva
+      reason: the only inference path (X-Sensitivity propagated verbatim; restricted → local lane)
+    - platform: enclii
+      reason: deploy, managed Postgres addon, secrets intake
+---
+apiVersion: enclii.dev/v1
+kind: Service
+metadata:
+  name: tlacuilo-web
+  project: tlacuilo
+  description: tlacuilo landing — the only public surface (static page, Caddy, non-root)
+spec:
+  status:
+    enabled: true
+    entries:
+      - name: tlacuilo (landing)
+        url: https://tlacuilo.madfam.io/health
+        href: https://tlacuilo.madfam.io
+        group: Platform
+        family: MADFAM Platform
+        description: Document intelligence — landing page (API is in-cluster only)
+
+  build:
+    type: dockerfile
+    dockerfile: web/Dockerfile
+    context: .
+    source:
+      git:
+        repository: https://github.com/madfam-org/tlacuilo
+        branch: main
+        autoDeploy: true
+
+  runtime:
+    port: 8080
+    replicas: 1
+    resources:
+      requests:
+        cpu: "10m"
+        memory: "32Mi"
+      limits:
+        cpu: "200m"
+        memory: "64Mi"
+    healthCheck: /health
+    healthCheckTimeoutSeconds: 3
+
+  domains:
+    - name: tlacuilo.madfam.io
+      environment: production
+      tlsEnabled: true
+
+  slo:
+    availability: 99.5
+    latencyP99Ms: 500
+
+  network:
+    services:
+      - name: tlacuilo-web
+        port: 8080
+        ingress: [cloudflare-tunnel]
+        egress: [dns]

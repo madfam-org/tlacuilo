@@ -1,0 +1,84 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tlacuilo-worker
+  namespace: tlacuilo
+  labels:
+    app.kubernetes.io/name: tlacuilo-worker
+    app.kubernetes.io/part-of: tlacuilo
+  annotations:
+    reloader.stakater.com/auto: "true"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: tlacuilo-worker
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: tlacuilo-worker
+        app.kubernetes.io/part-of: tlacuilo
+        app: tlacuilo-worker
+        enclii.dev/service: tlacuilo-worker
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        fsGroup: 1001
+        seccompProfile:
+          type: RuntimeDefault
+      imagePullSecrets:
+        - name: ghcr-credentials
+      containers:
+        - name: worker
+          # Same image as the API (DECOY tag; the pin is in kustomization.yaml).
+          image: ghcr.io/madfam-org/tlacuilo/tlacuilo-api:latest
+          command: ["celery", "-A", "tlacuilo.worker:celery_app", "worker", "-l", "info", "--concurrency=2", "-Q", "celery"]
+          securityContext:
+            privileged: false
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          env:
+            - name: TLACUILO_ENV
+              value: production
+            - name: JANUA_BASE_URL
+              value: https://auth.madfam.io
+            - name: JANUA_AUDIENCE
+              value: tlacuilo
+            - name: SELVA_BASE_URL
+              value: http://inference-gateway.selva.svc.cluster.local
+            - name: SELVA_ENABLED
+              value: "false"
+            - name: FETCH_HOST_ALLOWLIST
+              value: .r2.cloudflarestorage.com
+            - name: MAX_UPLOAD_BYTES
+              value: "26214400"
+            - name: SYNC_MAX_PAGES
+              value: "10"
+            - name: JOB_TTL_SECONDS
+              value: "86400"
+            - name: RESULT_TTL_SECONDS
+              value: "900"
+          envFrom:
+            - secretRef:
+                name: tlacuilo-secrets
+            - secretRef:
+                name: tlacuilo-config
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          resources:
+            requests: { cpu: 100m, memory: 384Mi }
+            limits: { cpu: "1", memory: 1536Mi }
+          livenessProbe:
+            exec:
+              command: ["celery", "-A", "tlacuilo.worker:celery_app", "inspect", "ping", "-d", "celery@$(HOSTNAME)", "--timeout", "10"]
+            initialDelaySeconds: 60
+            periodSeconds: 120
+            timeoutSeconds: 15
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 1Gi

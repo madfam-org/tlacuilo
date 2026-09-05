@@ -1,0 +1,189 @@
+---
+# The tlacuilo API is in-cluster only. Ingress: the consumer namespaces and the
+# metrics scraper for the API; cloudflared for the landing pods only. Egress: DNS, the
+# data namespace (Postgres, Redis, pgbouncer), Selva's gateway, and 443 for the
+# Janua JWKS fetch and a caller's presigned R2 URL. Peers use one selector each
+# (k3s combined-selector deny, internal-devops feedback).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: tlacuilo
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: tlacuilo
+  policyTypes:
+    - Ingress
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-consumer-ingress
+  namespace: tlacuilo
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: tlacuilo-api
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchExpressions:
+              - key: kubernetes.io/metadata.name
+                operator: In
+                values:
+                  - dhanam
+                  - karafiel
+                  - enclii-dhanam-staging
+                  - enclii-karafiel-staging
+      ports:
+        - protocol: TCP
+          port: 8000
+---
+# The landing is the only public surface: cloudflared may reach tlacuilo-web and
+# nothing else. The API keeps no tunnel peer — CI asserts this.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-cloudflared-ingress
+  namespace: tlacuilo
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: tlacuilo-web
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: cloudflare-tunnel
+      ports:
+        - protocol: TCP
+          port: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-monitoring-ingress
+  namespace: tlacuilo
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: tlacuilo-api
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - protocol: TCP
+          port: 8000
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-data-egress
+  namespace: tlacuilo
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: tlacuilo
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: data
+      ports:
+        - protocol: TCP
+          port: 5432
+        - protocol: TCP
+          port: 6379
+        - protocol: TCP
+          port: 6432
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns-egress
+  namespace: tlacuilo
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: tlacuilo
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-selva-egress
+  namespace: tlacuilo
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: tlacuilo
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: selva
+      ports:
+        - protocol: TCP
+          port: 80
+        - protocol: TCP
+          port: 4306
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-https-egress
+  namespace: tlacuilo
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: tlacuilo
+  policyTypes:
+    - Egress
+  egress:
+    - ports:
+        - protocol: TCP
+          port: 443
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-intra-namespace
+  namespace: tlacuilo
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: tlacuilo
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector: {}
+  egress:
+    - to:
+        - podSelector: {}

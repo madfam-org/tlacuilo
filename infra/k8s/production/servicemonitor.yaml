@@ -1,0 +1,19 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: tlacuilo-api-monitor
+  namespace: tlacuilo
+  labels:
+    app: tlacuilo
+spec:
+  selector:
+    matchLabels:
+      app: tlacuilo
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s
+  namespaceSelector:
+    matchNames:
+      - tlacuilo

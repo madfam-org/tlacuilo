@@ -1,0 +1,95 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tlacuilo-api
+  namespace: tlacuilo
+  labels:
+    app.kubernetes.io/name: tlacuilo-api
+    app.kubernetes.io/part-of: tlacuilo
+  annotations:
+    # A Secret change does not restart pods on its own (karafiel, 2026-07-30).
+    reloader.stakater.com/auto: "true"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: tlacuilo-api
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: tlacuilo-api
+        app.kubernetes.io/part-of: tlacuilo
+        # enclii convention labels (switchyard selects pods by these).
+        app: tlacuilo
+        enclii.dev/service: tlacuilo
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        fsGroup: 1001
+        seccompProfile:
+          type: RuntimeDefault
+      imagePullSecrets:
+        - name: ghcr-credentials
+      containers:
+        - name: api
+          # DECOY: the real pin is the images: block in kustomization.yaml.
+          image: ghcr.io/madfam-org/tlacuilo/tlacuilo-api:latest
+          securityContext:
+            privileged: false
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          ports:
+            - name: http
+              containerPort: 8000
+          env:
+            - name: TLACUILO_ENV
+              value: production
+            - name: JANUA_BASE_URL
+              value: https://auth.madfam.io
+            - name: JANUA_AUDIENCE
+              value: tlacuilo
+            - name: SELVA_BASE_URL
+              value: http://inference-gateway.selva.svc.cluster.local
+            - name: SELVA_ENABLED
+              value: "false"
+            - name: FETCH_HOST_ALLOWLIST
+              value: .r2.cloudflarestorage.com
+            - name: MAX_UPLOAD_BYTES
+              value: "26214400"
+            - name: SYNC_MAX_PAGES
+              value: "10"
+            - name: JOB_TTL_SECONDS
+              value: "86400"
+            - name: RESULT_TTL_SECONDS
+              value: "900"
+          envFrom:
+            # tlacuilo-secrets: DATABASE_URL, written by the Enclii postgres addon
+            # (GOTCHA 7: pooled URL needs the pgbouncer userlist entry first).
+            - secretRef:
+                name: tlacuilo-secrets
+            # tlacuilo-config: queue URLs, Selva worker token, callback HMAC —
+            # ExternalSecret from Vault secret/tlacuilo (external-secret.yaml).
+            - secretRef:
+                name: tlacuilo-config
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { cpu: "1", memory: 1Gi }
+          livenessProbe:
+            httpGet: { path: /health, port: http }
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet: { path: /ready, port: http }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        # Bytes for one job only; sized so a runaway upload cannot fill the node.
+        - name: tmp
+          emptyDir:
+            sizeLimit: 512Mi

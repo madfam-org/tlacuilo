@@ -1,0 +1,32 @@
+name: Build & Deploy
+
+# Caller for the shared reusable workflow in madfam-org/enclii — buildx → GHCR :${SHA}
+# → keyless cosign sign+verify → kustomize digest pin committed to main → ArgoCD sync.
+# The ref is a PINNED TAG (cosign identity regexp accepts only main/tags).
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['**.md', 'docs/**']
+  workflow_dispatch:
+
+concurrency:
+  group: tlacuilo-production-kustomization
+  cancel-in-progress: false
+
+jobs:
+  build-publish:
+    uses: madfam-org/enclii/.github/workflows/build-publish.yml@v1.0.0-alpha.6
+    with:
+      image_prefix: ghcr.io/madfam-org/tlacuilo
+      kustomization_path: infra/k8s/production
+      services: |
+        [
+          {"name":"tlacuilo-api", "dockerfile":"Dockerfile", "paths":"tlacuilo contracts pyproject.toml Dockerfile"},
+          {"name":"tlacuilo-web", "dockerfile":"web/Dockerfile", "paths":"web"}
+        ]
+    secrets: inherit
+    permissions:
+      contents: write
+      packages: write
+      id-token: write

@@ -1,0 +1,80 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# Public repository: GitHub-hosted runners on purpose (free for public repos, and
+# pull requests from forks must never execute on MADFAM's own runners).
+jobs:
+  test:
+    name: lint, tests, contract and guards
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: python -m pip install --upgrade pip && python -m pip install -e '.[dev]'
+      - name: Lint
+        run: ruff check .
+      - name: Tests
+        run: pytest -q
+      - name: Contract in sync
+        run: python -m tlacuilo.cli check-schema
+      - name: Selva contract (no provider keys, no hosted OCR)
+        run: scripts/check-selva-contract.sh
+      - name: License allowlist
+        run: PYTHON=python scripts/check-licenses.sh
+      - name: Secret coverage
+        run: python scripts/check-secret-coverage.py
+
+  manifests:
+    name: kustomize render + manifest rules
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch kustomize
+        run: |
+          curl -sSLo kustomize.tgz https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.5.0/kustomize_v5.5.0_linux_amd64.tar.gz
+          tar -xzf kustomize.tgz && chmod +x kustomize
+      - name: Render production overlay
+        run: ./kustomize build infra/k8s/production > /tmp/render.yaml && grep -c '^kind:' /tmp/render.yaml
+      - name: Manifest rules
+        run: |
+          python3 -m pip install -q pyyaml
+          python3 - <<'PY'
+          import re, sys
+          r = open('/tmp/render.yaml').read()
+          assert 'kind: Namespace' not in r, 'Enclii owns the namespace'
+          assert 'kind: Ingress' not in r, 'no Ingress objects: the tunnel is the only edge'
+          import yaml
+          docs = [d for d in yaml.safe_load_all(r) if d]
+          tunnel = [d for d in docs if d.get('kind') == 'NetworkPolicy' and 'cloudflare-tunnel' in str(d.get('spec', {}).get('ingress', ''))]
+          assert len(tunnel) == 1 and tunnel[0]['spec']['podSelector']['matchLabels'] == {'app.kubernetes.io/name': 'tlacuilo-web'}, 'the tunnel may reach the landing pods ONLY'
+          assert r.count('runAsNonRoot: true') >= 2, 'both deployments run non-root'
+          assert r.count('readOnlyRootFilesystem: true') >= 2
+          k = open('infra/k8s/production/kustomization.yaml').read()
+          assert re.search(r'digest: sha256:[0-9a-f]{64}', k), 'digest pin present'
+          print('manifest rules ok')
+          PY
+
+  image:
+    name: docker build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build (no push)
+        run: docker build -t tlacuilo:ci . && docker build -t tlacuilo-web:ci -f web/Dockerfile .
+      - name: Smoke the image
+        run: |
+          docker run --rm tlacuilo:ci python -c "import tlacuilo, tlacuilo.api; print('import ok', tlacuilo.__version__)"
+          docker run --rm tlacuilo:ci tesseract --version | head -1
+          docker run --rm tlacuilo-web:ci caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile

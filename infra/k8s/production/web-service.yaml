@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  # GOTCHA 2: the enclii service name, port 80. The tunnel route for
+  # tlacuilo.madfam.io dials tlacuilo-web.tlacuilo.svc.cluster.local:80.
+  name: tlacuilo-web
+  namespace: tlacuilo
+  labels:
+    app: tlacuilo-web
+spec:
+  selector:
+    app.kubernetes.io/name: tlacuilo-web
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

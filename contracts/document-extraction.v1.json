@@ -1,0 +1,502 @@
+{
+  "$defs": {
+    "DocumentInfo": {
+      "additionalProperties": false,
+      "properties": {
+        "classification": {
+          "$ref": "#/$defs/Sensitivity"
+        },
+        "language": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Language"
+        },
+        "mimeType": {
+          "title": "Mimetype",
+          "type": "string"
+        },
+        "pages": {
+          "minimum": 0,
+          "title": "Pages",
+          "type": "integer"
+        },
+        "sha256": {
+          "maxLength": 64,
+          "minLength": 64,
+          "title": "Sha256",
+          "type": "string"
+        },
+        "sizeBytes": {
+          "minimum": 0,
+          "title": "Sizebytes",
+          "type": "integer"
+        },
+        "type": {
+          "$ref": "#/$defs/DocumentType"
+        }
+      },
+      "required": [
+        "type",
+        "mimeType",
+        "pages",
+        "sha256",
+        "sizeBytes",
+        "classification"
+      ],
+      "title": "DocumentInfo",
+      "type": "object"
+    },
+    "DocumentType": {
+      "enum": [
+        "bank_statement",
+        "receipt",
+        "invoice",
+        "csf",
+        "opinion_32d",
+        "id_document",
+        "unknown"
+      ],
+      "title": "DocumentType",
+      "type": "string"
+    },
+    "Engines": {
+      "additionalProperties": false,
+      "properties": {
+        "layout": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Layout"
+        },
+        "ocr": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ocr"
+        },
+        "text": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Text"
+        },
+        "vlm": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Vlm"
+        }
+      },
+      "title": "Engines",
+      "type": "object"
+    },
+    "Period": {
+      "additionalProperties": false,
+      "properties": {
+        "end": {
+          "format": "date",
+          "title": "End",
+          "type": "string"
+        },
+        "start": {
+          "format": "date",
+          "title": "Start",
+          "type": "string"
+        }
+      },
+      "required": [
+        "start",
+        "end"
+      ],
+      "title": "Period",
+      "type": "object"
+    },
+    "Provenance": {
+      "additionalProperties": false,
+      "properties": {
+        "durationMs": {
+          "minimum": 0,
+          "title": "Durationms",
+          "type": "integer"
+        },
+        "engines": {
+          "$ref": "#/$defs/Engines"
+        },
+        "fingerprintConfidence": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Fingerprintconfidence",
+          "type": "number"
+        },
+        "parser": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parser"
+        },
+        "service": {
+          "const": "tlacuilo",
+          "default": "tlacuilo",
+          "title": "Service",
+          "type": "string"
+        },
+        "version": {
+          "default": "0.1.0",
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "engines",
+        "fingerprintConfidence",
+        "durationMs"
+      ],
+      "title": "Provenance",
+      "type": "object"
+    },
+    "Sensitivity": {
+      "enum": [
+        "public",
+        "internal",
+        "confidential",
+        "restricted"
+      ],
+      "title": "Sensitivity",
+      "type": "string"
+    },
+    "Statement": {
+      "additionalProperties": false,
+      "properties": {
+        "accountLast4": {
+          "anyOf": [
+            {
+              "maxLength": 4,
+              "minLength": 4,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Accountlast4"
+        },
+        "bank": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bank"
+        },
+        "clabeLast4": {
+          "anyOf": [
+            {
+              "maxLength": 4,
+              "minLength": 4,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Clabelast4"
+        },
+        "closingBalance": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Closingbalance"
+        },
+        "currency": {
+          "maxLength": 3,
+          "minLength": 3,
+          "title": "Currency",
+          "type": "string"
+        },
+        "openingBalance": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Openingbalance"
+        },
+        "period": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Period"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "transactions": {
+          "items": {
+            "$ref": "#/$defs/StatementRow"
+          },
+          "title": "Transactions",
+          "type": "array"
+        }
+      },
+      "required": [
+        "currency"
+      ],
+      "title": "Statement",
+      "type": "object"
+    },
+    "StatementRow": {
+      "additionalProperties": false,
+      "properties": {
+        "amount": {
+          "description": "Signed: inflow positive, outflow negative",
+          "title": "Amount",
+          "type": "number"
+        },
+        "balanceAfter": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Balanceafter"
+        },
+        "bbox": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "number"
+              },
+              "maxItems": 4,
+              "minItems": 4,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bbox"
+        },
+        "confidence": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "date": {
+          "format": "date",
+          "title": "Date",
+          "type": "string"
+        },
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "page": {
+          "minimum": 1,
+          "title": "Page",
+          "type": "integer"
+        },
+        "reference": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reference"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "valueDate": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valuedate"
+        }
+      },
+      "required": [
+        "seq",
+        "date",
+        "description",
+        "amount",
+        "confidence",
+        "page"
+      ],
+      "title": "StatementRow",
+      "type": "object"
+    },
+    "Validation": {
+      "additionalProperties": false,
+      "properties": {
+        "balanceReconciles": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "null when opening/closing balances are missing",
+          "title": "Balancereconciles"
+        },
+        "expectedDelta": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expecteddelta"
+        },
+        "sumOfRows": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sumofrows"
+        },
+        "unparsedLines": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Unparsedlines",
+          "type": "integer"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "title": "Validation",
+      "type": "object"
+    }
+  },
+  "$id": "https://github.com/madfam-org/internal-devops/blob/main/ecosystem/contracts/document-extraction.v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "contract": {
+      "const": "document-extraction/v1",
+      "default": "document-extraction/v1",
+      "title": "Contract",
+      "type": "string"
+    },
+    "document": {
+      "$ref": "#/$defs/DocumentInfo"
+    },
+    "fields": {
+      "additionalProperties": true,
+      "title": "Fields",
+      "type": "object"
+    },
+    "provenance": {
+      "$ref": "#/$defs/Provenance"
+    },
+    "statement": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Statement"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "validation": {
+      "$ref": "#/$defs/Validation"
+    }
+  },
+  "required": [
+    "document",
+    "provenance",
+    "validation"
+  ],
+  "title": "document-extraction/v1",
+  "type": "object"
+}
