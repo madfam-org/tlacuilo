@@ -26,3 +26,6 @@ images:
 - digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
   name: ghcr.io/madfam-org/tlacuilo/tlacuilo-web
   newName: ghcr.io/madfam-org/tlacuilo/tlacuilo-web
+
+# bootstrap 2026-09-05: second commit touching this directory so the reusable build
+# workflow (which diffs before-SHA..HEAD) sees a change and produces the first pins.
