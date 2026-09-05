@@ -20,12 +20,9 @@ resources:
 # change detection diffs before-SHA..HEAD; on the very first push there is no HEAD~1
 # and the build is SKIPPED — a second commit touching infra/k8s/production/ fixes it.
 images:
-- digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+- digest: sha256:70d555e68cf6cf8caee2f90d74ded08b4e8ec70efd8424907e95694219f30cbc
   name: ghcr.io/madfam-org/tlacuilo/tlacuilo-api
   newName: ghcr.io/madfam-org/tlacuilo/tlacuilo-api
-- digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+- digest: sha256:b0888e9bfe01b30f85ef99bad70c3de326630c644ae29301645c7aac58922353
   name: ghcr.io/madfam-org/tlacuilo/tlacuilo-web
   newName: ghcr.io/madfam-org/tlacuilo/tlacuilo-web
-
-# bootstrap 2026-09-05: second commit touching this directory so the reusable build
-# workflow (which diffs before-SHA..HEAD) sees a change and produces the first pins.
