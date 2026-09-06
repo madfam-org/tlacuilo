@@ -20,9 +20,9 @@ resources:
 # change detection diffs before-SHA..HEAD; on the very first push there is no HEAD~1
 # and the build is SKIPPED — a second commit touching infra/k8s/production/ fixes it.
 images:
-- digest: sha256:26c522bbd088c8ff2617b51e07a56e4097d6962adbc98ee20619d9213bad62cb
+- digest: sha256:3cdf43df8e3217a8f7e7046b87449a1b7a33b7cd210418b31952a8c03f05158b
   name: ghcr.io/madfam-org/tlacuilo/tlacuilo-api
   newName: ghcr.io/madfam-org/tlacuilo/tlacuilo-api
-- digest: sha256:2f4c7c94b37fc394f389bd3688a71b1f7a55a9df9a6da2e09d7fdd4cf63200b7
+- digest: sha256:a7be0a104ef8103ab4769f0b400d399d9e078074605405e59ba5cbbafdb74701
   name: ghcr.io/madfam-org/tlacuilo/tlacuilo-web
   newName: ghcr.io/madfam-org/tlacuilo/tlacuilo-web
