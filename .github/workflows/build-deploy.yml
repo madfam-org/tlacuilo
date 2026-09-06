@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   build-publish:
-    uses: madfam-org/enclii/.github/workflows/build-publish.yml@v1.0.0-alpha.6
+    uses: madfam-org/enclii/.github/workflows/build-publish.yml@v1.0.0-alpha.8
     with:
       image_prefix: ghcr.io/madfam-org/tlacuilo
       kustomization_path: infra/k8s/production
