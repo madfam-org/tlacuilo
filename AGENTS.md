@@ -14,7 +14,7 @@ The MADFAM ecosystem's document-intelligence service (design record: internal-de
 RFC 0040): capture → classify → text layer or OCR → layout → typed parsing → validation →
 a schema-versioned, confidence-scored `document-extraction/v1` result with provenance.
 Consumers: dhanam (bank statements into the ledger), karafiel (receipts, SAT documents),
-later meridian (passport MRZ), crea-map (scanned forms), tezca (scanned gazettes).
+later meridian (passport MRZ), tezca (scanned gazettes).
 
 Ruled by the owner on 2026-09-05: standalone service · Python · no third-party cloud for
 restricted documents · substrate, not a catalog SKU · **public repository under
