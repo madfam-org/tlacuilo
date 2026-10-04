@@ -2,7 +2,7 @@
 
 MADFAM's document-intelligence service: OCR and typed extraction for the documents the
 ecosystem keeps re-discovering it needs to read — bank statements first (dhanam), then
-receipts, SAT documents (karafiel), passports (meridian) and scanned forms (crea-map).
+receipts, SAT documents (karafiel), passports (meridian) and scanned forms.
 
 Free software under the [GNU AGPL-3.0](./LICENSE). Landing: <https://tlacuilo.madfam.io>.
 Ruled 2026-09-05 (design record in MADFAM's private internal-devops RFC 0040): standalone,
