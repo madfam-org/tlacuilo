@@ -9,7 +9,13 @@ metadata:
   annotations:
     reloader.stakater.com/auto: "true"
 spec:
-  replicas: 1
+  # PARKED (2026-11-04): 0 until onboarding completes. Since 09-06 every
+  # pod has sat in CreateContainerConfigError: Secret `tlacuilo-secrets`
+  # (DATABASE_URL from the Enclii postgres addon) was never created, and
+  # ExternalSecret `tlacuilo-config` cannot read Vault `secret/tlacuilo`.
+  # Two stuck ReplicaSets per Deployment held scheduler requests for pods
+  # that can never start. Set back to 1 once both Secrets exist.
+  replicas: 0
   selector:
     matchLabels:
       app.kubernetes.io/name: tlacuilo-worker
