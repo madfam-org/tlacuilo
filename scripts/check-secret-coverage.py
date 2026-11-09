@@ -3,7 +3,10 @@
 manifests — as a plain env var, an ExternalSecret data key, or a key the Enclii
 Postgres addon writes. A key read by code but declared nowhere is the class of
 outage dhanam's SELVA_API_KEY comment describes (read, never provisioned, silently
-degraded). Run from the repo root."""
+degraded). Spec-only manifests that the kustomization does not wire yet (the api,
+worker and their ExternalSecret until launch) count as declarations: this guard is
+about the code and the manifests agreeing, and tests/test_manifests.py guards the
+wiring. Run from the repo root."""
 
 from __future__ import annotations
 

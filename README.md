@@ -38,3 +38,37 @@ every call carries a Janua RS256 service token with the role `tlacuilo:extract` 
 - The landing at `tlacuilo.madfam.io` (`web/`), the only public surface; the API is in-cluster.
 - Not yet: OCR of scans (Tesseract is installed in the image for M1), per-bank parsers,
   the Selva VLM lane (M3), receipts / CSF / MRZ (M3–M4).
+
+## Production status: landing live, api and worker not launched yet
+
+In production only the landing runs. The api and worker Deployments and the
+`tlacuilo-config` ExternalSecret are kept in `infra/k8s/production/` as **spec only, not
+wired**: they are commented out of `kustomization.yaml`, and `tests/test_manifests.py`
+asserts that. Wired before their Secrets existed, their pods could never start and the
+ExternalSecret could never sync, so the Argo Application stayed Degraded and could not
+signal a real fault. The `tlacuilo` Service, NetworkPolicies, ServiceMonitor and
+PrometheusRule stay wired; a Service with no endpoints is healthy.
+
+### Launching the api and worker
+
+Do these in order. Each step is an operator step; no value enters this repo.
+
+1. **Database.** Provision the Enclii postgres addon so the Secret `tlacuilo-secrets`
+   (`DATABASE_URL`) exists in the `tlacuilo` namespace.
+2. **Vault `secret/tlacuilo`.** Add Enclii secret-intake targets for its four properties
+   and write them through the intake:
+   - `callback_hmac_key`: an internal random key (`--generate`).
+   - `selva_api_key`: issued by Selva's client provisioning.
+   - `celery_broker_url` and `celery_result_backend`: need a Redis decision first.
+3. **Identity.** Register the Janua service clients that call the api (role
+   `tlacuilo:extract`).
+4. **Wire the ExternalSecret.** Uncomment `external-secret.yaml` in `kustomization.yaml`
+   and confirm `ExternalSecret tlacuilo-config` is `Ready=True` after its first refresh.
+5. **Launch.** Uncomment `api-deployment.yaml` and `worker-deployment.yaml` (both declare
+   `replicas: 1`) and flip `test_api_worker_and_external_secret_are_not_wired_until_launch`
+   in the same PR. Argo creates the Deployments; `/ready` turns green once the database
+   pool knows the new role.
+
+Steps 4 and 5 can share one PR only if steps 1–3 are already done. Do not use
+`replicas` in git to park or unpark a live Deployment: the Application ignores
+`/spec/replicas` on existing Deployments, so only creation honours it.

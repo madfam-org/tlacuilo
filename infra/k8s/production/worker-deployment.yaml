@@ -1,3 +1,19 @@
+# SPEC ONLY, NOT WIRED. This file is deliberately NOT listed in
+# production/kustomization.yaml: the Celery worker has never run in production. From
+# onboarding (2026-09-05) until it was unwired, every pod sat in
+# CreateContainerConfigError because neither Secret in `envFrom` exists:
+# `tlacuilo-secrets` (DATABASE_URL, written by the Enclii postgres addon, never
+# provisioned) and `tlacuilo-config` (ExternalSecret from Vault secret/tlacuilo,
+# which has never existed). The Deployment reported ProgressDeadlineExceeded and
+# kept the tlacuilo-services Argo Application Degraded, hiding any real fault.
+# Setting `replicas: 0` here did not help: the Application ignores
+# /spec/replicas on Deployments, so git replicas never reach a live object.
+#
+# Wire it (uncomment it in production/kustomization.yaml and flip
+# tests/test_manifests.py, in the same change) only when every step in README
+# «Launching the api and worker» is done: both Secrets exist in the namespace and
+# external-secret.yaml is wired and Ready. Argo then creates the Deployment with
+# the replicas below.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -9,13 +25,7 @@ metadata:
   annotations:
     reloader.stakater.com/auto: "true"
 spec:
-  # PARKED (2026-11-04): 0 until onboarding completes. Since 09-06 every
-  # pod has sat in CreateContainerConfigError: Secret `tlacuilo-secrets`
-  # (DATABASE_URL from the Enclii postgres addon) was never created, and
-  # ExternalSecret `tlacuilo-config` cannot read Vault `secret/tlacuilo`.
-  # Two stuck ReplicaSets per Deployment held scheduler requests for pods
-  # that can never start. Set back to 1 once both Secrets exist.
-  replicas: 0
+  replicas: 1
   selector:
     matchLabels:
       app.kubernetes.io/name: tlacuilo-worker
