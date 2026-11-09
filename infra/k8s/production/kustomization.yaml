@@ -3,13 +3,13 @@ kind: Kustomization
 namespace: tlacuilo
 
 resources:
-- api-deployment.yaml
-- worker-deployment.yaml
+# - api-deployment.yaml     SPEC ONLY, NOT WIRED until the api and worker launch
+# - worker-deployment.yaml  (README «Launching the api and worker»; file headers).
 - service.yaml
 - web-deployment.yaml
 - web-service.yaml
 - network-policies.yaml
-- external-secret.yaml
+# - external-secret.yaml    SPEC ONLY, NOT WIRED until Vault holds secret/tlacuilo.
 - servicemonitor.yaml
 - prometheusrule.yaml
 

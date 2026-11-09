@@ -77,6 +77,8 @@ service owns *extractions*, not *documents*.
 - `web/` — the landing (static HTML, Caddy, non-root, `/health`).
 - `infra/k8s/production/` — Deployments (api, worker, web), Services, NetworkPolicies,
   the ExternalSecret for queue and gateway credentials, ServiceMonitor, PrometheusRule.
+  The api and worker Deployments and the ExternalSecret are **spec only, not wired**
+  until launch (README «Launching the api and worker»; guarded by `tests/test_manifests.py`).
 - `scripts/` — the three CI guards (gateway contract, licence gate, secret coverage).
 
 ## Deploy shape (public-safe summary)

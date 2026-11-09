@@ -59,8 +59,18 @@ jobs:
           docs = [d for d in yaml.safe_load_all(r) if d]
           tunnel = [d for d in docs if d.get('kind') == 'NetworkPolicy' and 'cloudflare-tunnel' in str(d.get('spec', {}).get('ingress', ''))]
           assert len(tunnel) == 1 and tunnel[0]['spec']['podSelector']['matchLabels'] == {'app.kubernetes.io/name': 'tlacuilo-web'}, 'the tunnel may reach the landing pods ONLY'
-          assert r.count('runAsNonRoot: true') >= 2, 'both deployments run non-root'
-          assert r.count('readOnlyRootFilesystem: true') >= 2
+          # Every Deployment, rendered or spec only (api and worker until launch, see
+          # README «Launching the api and worker»), runs non-root on a read-only root.
+          import pathlib
+          deps = [d for d in docs if d.get('kind') == 'Deployment']
+          deps += [d for f in ('api-deployment.yaml', 'worker-deployment.yaml')
+                   for d in yaml.safe_load_all(pathlib.Path('infra/k8s/production', f).read_text()) if d]
+          assert len(deps) == 3, 'web, api and worker Deployments'
+          for d in deps:
+              pod = d['spec']['template']['spec']
+              assert pod['securityContext']['runAsNonRoot'] is True, d['metadata']['name']
+              for c in pod['containers']:
+                  assert c['securityContext']['readOnlyRootFilesystem'] is True, d['metadata']['name']
           k = open('infra/k8s/production/kustomization.yaml').read()
           assert re.search(r'digest: sha256:[0-9a-f]{64}', k), 'digest pin present'
           print('manifest rules ok')
