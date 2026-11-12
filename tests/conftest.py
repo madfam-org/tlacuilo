@@ -1,5 +1,7 @@
 import datetime as dt
 import os
+import shutil
+import subprocess
 
 import jwt
 import pytest
@@ -16,6 +18,24 @@ os.environ.setdefault("CELERY_RESULT_BACKEND", "")
 _PRIVATE = rsa.generate_private_key(public_exponent=65537, key_size=2048)
 _PUBLIC_PEM = _PRIVATE.public_key().public_bytes(
     serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo
+)
+
+
+def _spanish_ocr_installed() -> bool:
+    binary = shutil.which("tesseract")
+    if binary is None:
+        return False
+    try:
+        listed = subprocess.run([binary, "--list-langs"], capture_output=True, timeout=10, check=False)
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return b"spa" in (listed.stdout + listed.stderr).split()
+
+
+# The image ships Tesseract with Spanish data and CI installs the same packages, so the
+# OCR path runs there; a bare machine skips these tests instead of failing them.
+needs_ocr_engine = pytest.mark.skipif(
+    not _spanish_ocr_installed(), reason="tesseract with Spanish language data is not installed"
 )
 
 
