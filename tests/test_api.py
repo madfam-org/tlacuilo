@@ -90,3 +90,32 @@ def test_async_requires_allowlisted_https_source(client, token):
         data={"mode": "async", "source_url": "https://acct.r2.cloudflarestorage.com/bucket/key?sig=1"},
     )
     assert r.status_code == 503 and r.json()["detail"]["error"] == "queue_unconfigured"
+
+
+def test_the_api_serves_sync_mode_with_the_database_alone(client, token, monkeypatch):
+    # The sync-only launch: no queue URLs, no gateway token, no callback key in the
+    # environment. The api is ready, sync extractions work, async says why it cannot.
+    from tlacuilo.settings import get_settings, reset_settings_cache
+
+    for key in ("CELERY_BROKER_URL", "CELERY_RESULT_BACKEND", "SELVA_API_KEY", "CALLBACK_HMAC_KEY"):
+        monkeypatch.delenv(key, raising=False)
+    reset_settings_cache()
+    try:
+        s = get_settings()
+        assert (s.celery_broker_url, s.celery_result_backend, s.selva_api_key, s.callback_hmac_key) == ("", "", "", "")
+        r = client.get("/ready")
+        assert r.status_code == 200 and r.json()["ready"] is True
+        assert r.json()["checks"]["db"] == "ok" and r.json()["checks"]["redis"] == "unconfigured"
+        pdf, _ = make_statement()
+        r = _post(client, token, pdf)
+        assert r.status_code == 200 and r.json()["validation"]["balanceReconciles"] is True
+        job = client.get(f"/v1/extractions/{r.headers['X-Tlacuilo-Job']}", headers={"Authorization": f"Bearer {token}"})
+        assert job.status_code == 200 and job.json()["status"] == "done"
+        r = client.post(
+            "/v1/extractions",
+            headers={"Authorization": f"Bearer {token}", "X-Sensitivity": "restricted"},
+            data={"mode": "async", "source_url": "https://acct.r2.cloudflarestorage.com/bucket/key?sig=1"},
+        )
+        assert r.status_code == 503 and r.json()["detail"]["error"] == "queue_unconfigured"
+    finally:
+        reset_settings_cache()
