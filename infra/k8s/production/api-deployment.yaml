@@ -1,7 +1,7 @@
-# SPEC ONLY, NOT WIRED. This file is deliberately NOT listed in
+# SPEC ONLY, NOT WIRED until the launch change lists this file in
 # production/kustomization.yaml: the API has never run in production. From
 # onboarding (2026-09-05) until it was unwired, every pod sat in
-# CreateContainerConfigError because neither Secret in `envFrom` exists:
+# CreateContainerConfigError because neither Secret in `envFrom` existed:
 # `tlacuilo-secrets` (DATABASE_URL, written by the Enclii postgres addon, never
 # provisioned) and `tlacuilo-config` (ExternalSecret from Vault secret/tlacuilo,
 # which has never existed). The Deployment reported ProgressDeadlineExceeded and
@@ -9,11 +9,14 @@
 # Setting `replicas: 0` here did not help: the Application ignores
 # /spec/replicas on Deployments, so git replicas never reach a live object.
 #
-# Wire it (uncomment it in production/kustomization.yaml and flip
-# tests/test_manifests.py, in the same change) only when every step in README
-# «Launching the api and worker» is done: both Secrets exist in the namespace and
-# external-secret.yaml is wired and Ready. Argo then creates the Deployment with
-# the replicas below.
+# The API needs ONE Secret to start: `tlacuilo-secrets`. `tlacuilo-config` is
+# optional below, so the first launch can be the API alone in sync mode (README
+# «Launching the api and worker», sync-only path): no queue, no gateway token, no
+# callback key, and
+# async requests answer 503 `queue_unconfigured`. Wire it (uncomment it in
+# production/kustomization.yaml and flip API_LAUNCHED in tests/test_manifests.py,
+# in the same change) only when `tlacuilo-secrets` exists in the namespace. Argo
+# then creates the Deployment with the replicas below.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -88,8 +91,11 @@ spec:
                 name: tlacuilo-secrets
             # tlacuilo-config: queue URLs, Selva worker token, callback HMAC —
             # ExternalSecret from Vault secret/tlacuilo (external-secret.yaml).
+            # Optional: the API starts without it and serves sync mode only. A pod
+            # reads it at start, so the first sync of the Secret needs a rollout.
             - secretRef:
                 name: tlacuilo-config
+                optional: true
           volumeMounts:
             - name: tmp
               mountPath: /tmp

@@ -23,6 +23,8 @@ jobs:
           python-version: "3.12"
       - name: Install
         run: python -m pip install --upgrade pip && python -m pip install -e '.[dev]'
+      - name: OCR engine (the same packages the image installs; without it the OCR tests skip)
+        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-spa
       - name: Lint
         run: ruff check .
       - name: Tests
@@ -65,6 +67,8 @@ jobs:
           deps = [d for d in docs if d.get('kind') == 'Deployment']
           deps += [d for f in ('api-deployment.yaml', 'worker-deployment.yaml')
                    for d in yaml.safe_load_all(pathlib.Path('infra/k8s/production', f).read_text()) if d]
+          # By name: once a spec-only Deployment is wired it is both rendered and on disk.
+          deps = list({d['metadata']['name']: d for d in deps}.values())
           assert len(deps) == 3, 'web, api and worker Deployments'
           for d in deps:
               pod = d['spec']['template']['spec']
@@ -91,6 +95,20 @@ jobs:
           H="--user 1001 --cap-drop ALL --security-opt no-new-privileges --read-only"
           docker run --rm $H --tmpfs /tmp tlacuilo:ci python -c "import tlacuilo, tlacuilo.api; print('import ok', tlacuilo.__version__)"
           docker run --rm $H --tmpfs /tmp tlacuilo:ci tesseract --version | head -1
+          docker run --rm $H --tmpfs /tmp tlacuilo:ci tesseract --list-langs | grep -x spa
+          # The letterhead lane's OCR, end to end, under the same restrictions: an
+          # invented word drawn in memory, read back through stdin and stdout.
+          docker run --rm $H --tmpfs /tmp tlacuilo:ci python -c "
+          import io
+          from PIL import Image, ImageDraw, ImageFont
+          from tlacuilo.engines import ocr
+          img = Image.new('L', (1400, 300), 255)
+          ImageDraw.Draw(img).text((40, 100), 'Escuela Primaria Ejemplo', font=ImageFont.load_default(size=72), fill=0)
+          buf = io.BytesIO(); img.save(buf, 'PNG')
+          page = ocr.image_pages(buf.getvalue(), 'image/png')[0]
+          assert 'Escuela' in ' '.join(line.text for line in page.lines), 'ocr smoke'
+          print('ocr ok:', ocr.engine_label())
+          "
           docker run --rm $H --tmpfs /data --tmpfs /config tlacuilo-web:ci caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
           docker run -d --name web $H --tmpfs /data --tmpfs /config -p 18080:8080 tlacuilo-web:ci
           for i in $(seq 1 20); do curl -fsS http://127.0.0.1:18080/health && break || sleep 1; done

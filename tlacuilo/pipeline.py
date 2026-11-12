@@ -1,6 +1,13 @@
 """One job, end to end: classify → text layer → fingerprint → parse → validate → result.
 
-Fails closed: an unreadable document is an error with a code, never a stub result."""
+Fails closed: an unreadable document is an error with a code, never a stub result.
+
+Two lanes, chosen by the caller and never by guessing. Without a document type, or with
+any type but one, a job takes the statement lane exactly as before. With
+`letterhead_document` it takes the letterhead lane (`_run_letterhead`): who issued the
+document and when, by rules alone, from the text layer or — for a scan or a photo — from
+OCR of at most two pages. The two lanes share no parser: a letter is never read as a
+statement, nor a statement as a letter."""
 
 from __future__ import annotations
 
@@ -15,14 +22,16 @@ from .contract import (
     DocumentType,
     Engines,
     ExtractionResult,
+    Issuer,
     Period,
     Provenance,
     Sensitivity,
     Statement,
     Validation,
 )
-from .engines import text_layer
+from .engines import ocr, text_layer
 from .metrics import DURATION, EXTRACTIONS, PAGES, VALIDATION
+from .parsers import letterhead
 from .parsers.generic_statement import header_columns, parse_statement, to_contract_rows
 from .parsers.registry import fingerprint, parser_id
 from .settings import get_settings
@@ -31,6 +40,7 @@ from .validate import validate_statement
 log = logging.getLogger(__name__)
 PDF = "application/pdf"
 IMAGES = {"image/png", "image/jpeg", "image/webp", "image/tiff"}
+LETTERHEAD_MIMES = (PDF, *ocr.IMAGE_FORMATS)  # the closed list the letterhead lane accepts
 
 
 class ExtractionError(Exception):
@@ -60,6 +70,8 @@ def run_extraction(
     started = time.perf_counter()
     sha = hashlib.sha256(data).hexdigest()
     mime = (mime_type or "").split(";")[0].strip().lower()
+    if doc_type_hint is DocumentType.letterhead_document:
+        return _run_letterhead(data, mime, sensitivity, sha=sha, started=started)
     if mime in IMAGES:
         raise ExtractionError("needs_ocr", engines=engines_available(), note="image inputs arrive with the M1 OCR lane")
     if mime != PDF:
@@ -135,6 +147,81 @@ def run_extraction(
         ),
         statement=statement,
         validation=validation,
+    )
+
+
+def _run_letterhead(data: bytes, mime: str, sensitivity: Sensitivity, *, sha: str, started: float) -> ExtractionResult:
+    """The letterhead lane: text layer first, OCR when there is none, then rules.
+
+    No model and no gateway: nothing on this path reads the inference settings or opens
+    a connection. The page limit of sync mode does not apply — the lane reads at most
+    `letterhead.PAGES` pages of any document and says so when there were more."""
+    if mime not in LETTERHEAD_MIMES:
+        raise ExtractionError("unsupported_mime", mime=mime, allowed=list(LETTERHEAD_MIMES))
+    used_ocr = False
+    try:
+        if mime == PDF:
+            try:
+                total = text_layer.page_count(data)
+                pages = text_layer.extract_pages(data, limit=letterhead.PAGES)
+            except Exception as exc:  # corrupt or encrypted PDF
+                log.info("pdf unreadable: %s", type(exc).__name__)
+                raise ExtractionError("unreadable_pdf", reason=type(exc).__name__) from None
+            if total < 1:
+                raise ExtractionError("unreadable_pdf", reason="no_pages")
+            if not text_layer.has_text_layer(pages):
+                pages, used_ocr = ocr.pdf_pages(data, letterhead.PAGES), True
+        else:
+            total = 1
+            pages, used_ocr = ocr.image_pages(data, mime), True
+    except ocr.OcrError as exc:
+        raise ExtractionError(exc.code, status=exc.status, **exc.extra) from None
+    words = sum(len(line.words) for page in pages for line in page.lines)
+    if used_ocr and words == 0:  # a blank or illegible scan is an error, not an empty result
+        raise ExtractionError("unreadable_scan", pages=len(pages))
+    PAGES.labels(engine="ocr" if used_ocr else "text").inc(len(pages))
+
+    draft = letterhead.extract_issuer(pages, ocr=used_ocr)
+    warnings = list(draft.warnings)
+    if used_ocr:
+        warnings.append("text read by OCR: confidences are reduced")
+    if total > len(pages):
+        warnings.append(f"only the first {len(pages)} of {total} pages were read")
+    found = sum(f is not None for f in (draft.institution, draft.professional, draft.document_date))
+
+    duration_ms = int((time.perf_counter() - started) * 1000)
+    DURATION.observe(duration_ms / 1000)
+    EXTRACTIONS.labels(doc_type=DocumentType.letterhead_document.value, outcome="ok").inc()
+    log.info(
+        "extraction ok type=%s pages=%d source=%s fields=%d ms=%d",
+        DocumentType.letterhead_document.value,
+        total,
+        "ocr" if used_ocr else "text",
+        found,
+        duration_ms,
+    )
+    engines = (
+        Engines(ocr=ocr.engine_label(rasterised=mime == PDF)) if used_ocr else Engines(text=text_layer.ENGINE)
+    )
+    return ExtractionResult(
+        document=DocumentInfo(
+            type=DocumentType.letterhead_document,
+            mimeType=mime,
+            pages=total,
+            language="es",
+            sha256=sha,
+            sizeBytes=len(data),
+            classification=sensitivity,
+        ),
+        provenance=Provenance(
+            version=__version__,
+            engines=engines,
+            parser=letterhead.PARSER_ID,
+            fingerprintConfidence=0.0,
+            durationMs=duration_ms,
+        ),
+        issuer=Issuer(**letterhead.to_contract(draft)),
+        validation=Validation(balanceReconciles=None, unparsedLines=0, warnings=warnings),
     )
 
 

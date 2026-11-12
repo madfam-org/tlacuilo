@@ -18,6 +18,10 @@ dependencies = [
   "pydantic-settings>=2.7",
   "python-multipart>=0.0.20",
   "pdfplumber>=0.11",
+  # Both already arrive with pdfplumber; named because tlacuilo/engines/ocr.py imports
+  # them itself (pypdfium2 rasterises a scanned page, Pillow decodes an uploaded image).
+  "pypdfium2>=4.18",
+  "pillow>=10.1",
   "celery[redis]>=5.4",
   "redis>=5.2",
   "sqlalchemy>=2.0",

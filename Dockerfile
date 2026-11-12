@@ -1,7 +1,8 @@
 # syntax=docker/dockerfile:1.7
 # tlacuilo — API and worker share this image (the worker runs `celery` from it).
-# CPU-only by design (RFC 0040 M0–M2). Tesseract + Spanish data are installed
-# now so M1's scan lane needs no image change; M0 does not call them.
+# CPU-only by design (RFC 0040 M0–M2). Tesseract + Spanish data (`spa`) are called
+# by the letterhead lane only (tlacuilo/engines/ocr.py, at most two pages); M1's
+# statement scan lane will need no image change.
 FROM python:3.12-slim AS runtime
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1
 RUN apt-get update \

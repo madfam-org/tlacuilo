@@ -2,7 +2,11 @@
 
 Sync mode takes a multipart upload (≤ SYNC_MAX_PAGES) and returns the result in the
 response — nothing is kept. Async mode takes the caller's presigned object URL, runs on
-the worker and hands the result back once (callback and/or a single GET)."""
+the worker and hands the result back once (callback and/or a single GET).
+
+The form field `document_type` (the closed `DocumentType` enum) names what the caller
+is sending. `letterhead_document` selects the letterhead lane — who issued the document
+and when, rules only; every other value, and no value, keeps the statement lane."""
 
 from __future__ import annotations
 
@@ -11,6 +15,7 @@ import logging
 from urllib.parse import urlparse
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, Response, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
@@ -127,9 +132,15 @@ async def create_extraction(
                 size_bytes=len(data),
             )
             try:
-                result = run_extraction(
-                    data, file.content_type or "", sensitivity, max_pages=s.sync_max_pages, doc_type_hint=hint
-                )
+                if hint is DocumentType.letterhead_document:
+                    # OCR can take seconds: off the event loop, so probes keep answering.
+                    result = await run_in_threadpool(
+                        run_extraction, data, file.content_type or "", sensitivity, doc_type_hint=hint
+                    )
+                else:
+                    result = run_extraction(
+                        data, file.content_type or "", sensitivity, max_pages=s.sync_max_pages, doc_type_hint=hint
+                    )
             except ExtractionError as exc:
                 job.status, job.error_code = "failed", exc.code
                 session.commit()

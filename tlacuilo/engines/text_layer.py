@@ -2,7 +2,8 @@
 
 Words come out with their boxes; we cluster them into lines by their `top` so parsers
 see one line of text plus the positions of every word in it. Scanned PDFs have no
-words at all: that is the signal the M1 OCR lane switches on."""
+words at all: that is the signal an OCR lane switches on (`engines/ocr.py`, which
+returns these same Word / Line / Page shapes)."""
 
 from __future__ import annotations
 
@@ -22,6 +23,7 @@ class Word:
     x1: float
     top: float
     bottom: float
+    conf: float | None = None  # 0–1 from an OCR engine; None for a text layer
 
     @property
     def xc(self) -> float:
@@ -60,10 +62,13 @@ def page_count(pdf_bytes: bytes) -> int:
         return len(pdf.pages)
 
 
-def extract_pages(pdf_bytes: bytes) -> list[Page]:
+def extract_pages(pdf_bytes: bytes, limit: int | None = None) -> list[Page]:
+    """Every page, or only the first `limit` pages when a lane reads no further."""
     pages: list[Page] = []
     with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
         for index, p in enumerate(pdf.pages, start=1):
+            if limit is not None and index > limit:
+                break
             raw = p.extract_words(x_tolerance=1.5, y_tolerance=2, keep_blank_chars=False)
             words = sorted(
                 (Word(w["text"], float(w["x0"]), float(w["x1"]), float(w["top"]), float(w["bottom"])) for w in raw),

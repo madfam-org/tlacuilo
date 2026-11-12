@@ -2,8 +2,10 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: tlacuilo
 
-# - api-deployment.yaml     SPEC ONLY, NOT WIRED until the api and worker launch
-# - worker-deployment.yaml  (README «Launching the api and worker»; file headers).
+# - api-deployment.yaml     SPEC ONLY, NOT WIRED until launch (README «Launching the api
+#                           and worker»). The api alone may be wired once its
+#                           database Secret exists (the sync-only path).
+# - worker-deployment.yaml  SPEC ONLY, NOT WIRED until the full launch (file header).
 # - external-secret.yaml    SPEC ONLY, NOT WIRED until Vault holds secret/tlacuilo.
 resources:
 - service.yaml
