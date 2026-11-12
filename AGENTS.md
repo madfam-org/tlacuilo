@@ -61,24 +61,43 @@ service owns *extractions*, not *documents*.
 ## Layout
 
 - `tlacuilo/api.py` — FastAPI: `/health`, `/ready`, `/metrics`, `POST /v1/extractions`
-  (sync multipart | async presigned URL), `GET /v1/extractions/{id}`.
-- `tlacuilo/pipeline.py` — one job end to end; raises `ExtractionError` with a code.
-- `tlacuilo/engines/text_layer.py` — pdfplumber words → lines with boxes. OCR lane: M1.
+  (sync multipart | async presigned URL), `GET /v1/extractions/{id}`. The form field
+  `document_type` (closed enum) names what the caller sends; `letterhead_document`
+  selects the letterhead lane, anything else and nothing keep the statement lane.
+- `tlacuilo/pipeline.py` — one job end to end; raises `ExtractionError` with a code. Two
+  lanes that share no parser: statements (the default) and `_run_letterhead`.
+- `tlacuilo/engines/text_layer.py` — pdfplumber words → lines with boxes.
+- `tlacuilo/engines/ocr.py` — OCR **for the letterhead lane only** (RFC 0040 amendment 1):
+  the image's Tesseract binary over stdin/stdout (Spanish, CPU, one job at a time),
+  pypdfium2 to rasterise a scanned PDF, the same Word / Line / Page shapes as the text
+  layer. Never more than two pages (a longer document is read that far and the result
+  says so); the pixel cap and the wall-clock budget are error codes, as is every other
+  failure (`image_too_large`, `ocr_timeout`, `ocr_busy`, `ocr_unavailable`, `ocr_failed`,
+  `unreadable_image`, `unreadable_scan`). Statement scans are still M1 (`needs_ocr`).
 - `tlacuilo/parsers/` — `common.py` (Mexican amounts and dates), `registry.py` (bank
   fingerprints; M1 adds `mx.<bank>.<product>.v<n>` parsers), `generic_statement.py`
-  (header columns, running balance, sign inference).
+  (header columns, running balance, sign inference), `letterhead.py` (who issued a
+  document and when: institution, professional, document date — **rules only, never a
+  model call, never the gateway**; closed keyword lists and a confidence table in its
+  docstring; a licence number, an address or a contact detail is never returned).
 - `tlacuilo/validate.py` — opening + Σ rows = closing, the only auto-commit signal.
 - `tlacuilo/contract.py` — the pydantic models; `contracts/document-extraction.v1.json`
   is generated from them (`python -m tlacuilo.cli schema`) and CI fails on drift. The
-  ecosystem's published copy must stay byte-identical.
+  ecosystem's published copy must stay byte-identical. Changes are additive within v1:
+  the `issuer` block is serialised only on letterhead results, so every other result
+  keeps exactly the keys it had (`tests/test_contract.py` pins the bytes).
 - `tlacuilo/worker.py` — Celery on the shared queue, one-shot result store, HMAC callback.
   `tlacuilo/db.py` — the jobs table (created at startup in M0; Alembic arrives with M1).
 - `tests/synth.py` — synthetic statements with ground truth; the accuracy harness seed.
+  `tests/synth_letter.py` — synthetic letters (text PDF, scan, scanned PDF) with ground
+  truth. Fixtures are invented and say so: never a real institution, person, licence
+  number or address.
 - `web/` — the landing (static HTML, Caddy, non-root, `/health`).
 - `infra/k8s/production/` — Deployments (api, worker, web), Services, NetworkPolicies,
   the ExternalSecret for queue and gateway credentials, ServiceMonitor, PrometheusRule.
   The api and worker Deployments and the ExternalSecret are **spec only, not wired**
   until launch (README «Launching the api and worker»; guarded by `tests/test_manifests.py`).
+  The api's queue Secret is optional, so the api alone can launch first in sync mode.
 - `scripts/` — the three CI guards (gateway contract, licence gate, secret coverage).
 
 ## Deploy shape (public-safe summary)
