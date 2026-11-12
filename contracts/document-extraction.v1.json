@@ -61,6 +61,7 @@
         "csf",
         "opinion_32d",
         "id_document",
+        "letterhead_document",
         "unknown"
       ],
       "title": "DocumentType",
@@ -119,6 +120,143 @@
         }
       },
       "title": "Engines",
+      "type": "object"
+    },
+    "Issuer": {
+      "additionalProperties": false,
+      "description": "Who issued a letterhead document and when. A field the rules did not find is\nnull: the lane never guesses. No free text, no licence number, no contact data.",
+      "properties": {
+        "documentDate": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/IssuerDate"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The date the document was issued, never a birth date"
+        },
+        "institution": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/IssuerParty"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "professional": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/IssuerParty"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "title": "Issuer",
+      "type": "object"
+    },
+    "IssuerDate": {
+      "additionalProperties": false,
+      "properties": {
+        "bbox": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "number"
+              },
+              "maxItems": 4,
+              "minItems": 4,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "x0, top, x1, bottom from the top-left corner: PDF points for a PDF, pixels of the image as displayed",
+          "title": "Bbox"
+        },
+        "confidence": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "date": {
+          "format": "date",
+          "title": "Date",
+          "type": "string"
+        },
+        "page": {
+          "minimum": 1,
+          "title": "Page",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "date",
+        "confidence",
+        "page"
+      ],
+      "title": "IssuerDate",
+      "type": "object"
+    },
+    "IssuerParty": {
+      "additionalProperties": false,
+      "properties": {
+        "bbox": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "number"
+              },
+              "maxItems": 4,
+              "minItems": 4,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "x0, top, x1, bottom from the top-left corner: PDF points for a PDF, pixels of the image as displayed",
+          "title": "Bbox"
+        },
+        "confidence": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "name": {
+          "description": "As written on the document; never a licence number, an address, a phone or an e-mail",
+          "maxLength": 160,
+          "minLength": 2,
+          "pattern": "^\\D*(?:\\d{1,3}\\D+)*\\d{0,3}$",
+          "title": "Name",
+          "type": "string"
+        },
+        "page": {
+          "minimum": 1,
+          "title": "Page",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "name",
+        "confidence",
+        "page"
+      ],
+      "title": "IssuerParty",
       "type": "object"
     },
     "Period": {
@@ -473,6 +611,18 @@
       "additionalProperties": true,
       "title": "Fields",
       "type": "object"
+    },
+    "issuer": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Issuer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Present only on letterhead_document results; the key is absent otherwise"
     },
     "provenance": {
       "$ref": "#/$defs/Provenance"
