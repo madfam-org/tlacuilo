@@ -92,3 +92,18 @@ def extract_pages(pdf_bytes: bytes, limit: int | None = None) -> list[Page]:
 
 def has_text_layer(pages: list[Page]) -> bool:
     return sum(len(line.words) for page in pages for line in page.lines) >= 20
+
+
+def full_page_images(pdf_bytes: bytes, limit: int, coverage: float = 0.8) -> bool:
+    """True when one of the first `limit` pages is mostly a picture: a scan, perhaps
+    with a scanner app's own invisible OCR text over it. That text is a reading of a
+    reading and is not treated as a text layer by lanes that care (the csf lane)."""
+    with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+        for p in pdf.pages[:limit]:
+            area = float(p.width) * float(p.height)
+            for image in p.images:
+                w = float(image["x1"]) - float(image["x0"])
+                h = float(image["bottom"]) - float(image["top"])
+                if area > 0 and w * h >= coverage * area:
+                    return True
+    return False

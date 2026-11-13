@@ -40,6 +40,47 @@ block instead of a `statement`: who issued the document and when.
   lower and `provenance.engines.ocr` names the engine). Boxes are PDF points for a PDF and
   pixels of the image for an image.
 
+For a **Constancia de Situación Fiscal**, the **csf lane** returns a `csf` block: every
+field the SAT prints (identity, domicilio fiscal by part, padrón facts, lugar y fecha de
+emisión), the régimen, actividades and obligaciones tables, the document's QR code and
+the head of its «Cadena Original Sello» as cross-checks, and a `quality` verdict.
+
+```json
+"csf": {
+  "legalForm": { "value": "persona_fisica", "confidence": 0.95 },
+  "fields": {
+    "rfc": { "value": "XAXP900101AB1", "status": "read", "confidence": 0.97, "lowConfidence": false,
+             "source": "ocr", "page": 1, "bbox": [x0, top, x1, bottom], "checks": ["format_ok", "qr_agrees"] },
+    "interiorNumber": { "value": null, "status": "blank", "confidence": 0.5, "lowConfidence": true, … },
+    …
+  },
+  "regimenes": [ { "name": "Régimen Simplificado de Confianza", "startDate": "2022-01-01", "endDate": null, … } ],
+  "qr":   { "status": "decoded", "url": "https://siat.sat.gob.mx/…", "satHost": true, "idCif": "…", "rfc": "…" },
+  "seal": { "status": "read", "timestamp": "2026-11-12T10:15:30", "rfc": "…" },
+  "quality": { "verdict": "good", "source": "ocr", "lowConfidenceFields": [], "unreadFields": [], … }
+}
+```
+
+- `document_type=csf` selects it. A text-layer PDF is read directly; a scan, a photo
+  (JPEG, PNG, HEIC/HEIF) or a PDF that is a picture under a scanner app's invisible text
+  is read by OCR after the page is prepared (orientation, contrast, skew, size, noise;
+  `tlacuilo/engines/scan.py`). `reader=ocr` asks for OCR even when there is a text layer:
+  a consumer's second reading of what the text layer did not yield.
+- Values are read **by region, not by line order**: the page-1 header of a real
+  constancia interleaves two blocks and wraps the emission phrase across them.
+- Every value is a reading: a status (`read`, `invalid`, `blank`, `not_found`,
+  `not_applicable`), a confidence, `lowConfidence` under 0.6, the source, the page, the
+  box and the checks it passed. The QR code (decoded, **never fetched**) and the seal
+  corroborate the RFC, the idCIF and the emission date — or pull a field down when they
+  disagree. Nothing is corrected or defaulted. Every value is confirmed by the person in
+  the consumer's interface; `lowConfidence` says which to present as doubtful.
+- Rules only: no model is called and nothing leaves the pod, at any sensitivity. A CSF
+  is a tax-identity document: callers send `X-Sensitivity: restricted`.
+- At most four pages are read, 60 s of OCR at most per document (one OCR job per pod at
+  a time); a limit is an error code. Accuracy on the synthetic corpus, per field and
+  degradation level: `python -m tests.csf_accuracy` (`tests/synth_csf.py` renders three
+  invented taxpayers and spoils them as scans and photos).
+
 ## Run locally
 
 ```bash
@@ -49,6 +90,8 @@ TLACUILO_ENV=local AUTH_DISABLED=true .venv/bin/uvicorn tlacuilo.api:app --port 
 curl -s -X POST localhost:8000/v1/extractions -H 'X-Sensitivity: restricted' -F file=@statement.pdf | jq .validation
 curl -s -X POST localhost:8000/v1/extractions -H 'X-Sensitivity: restricted' \
   -F document_type=letterhead_document -F file=@letter.pdf | jq .issuer
+curl -s -X POST localhost:8000/v1/extractions -H 'X-Sensitivity: restricted' \
+  -F document_type=csf -F file=@synthetic-constancia.jpg | jq .csf.quality
 ```
 
 `AUTH_DISABLED` is honoured only when `TLACUILO_ENV` is `local` or `test`. In the cluster
@@ -66,13 +109,20 @@ every call carries a Janua RS256 service token with the role `tlacuilo:extract` 
   by rules (`tlacuilo/parsers/letterhead.py`), with OCR for this lane only
   (`tlacuilo/engines/ocr.py`: Tesseract, Spanish, CPU, at most two pages, PDF / JPEG / PNG)
   and a synthetic letter generator with ground truth (`tests/synth_letter.py`).
+- The csf lane (RFC 0040 amendment 2, pending its record in internal-devops): every
+  field of a Constancia de Situación Fiscal by rules, OCR for scans and photos with page
+  preparation, the QR code and seal as cross-checks (`tlacuilo/parsers/csf*.py`,
+  `tlacuilo/engines/scan.py`, `tlacuilo/csf_contract.py`) and a synthetic corpus with
+  degradations (`tests/synth_csf.py`, `tests/csf_accuracy.py`).
 - Not yet: OCR of statement scans (M1 — a scanned statement still answers `needs_ocr`),
-  per-bank parsers, the Selva VLM lane (M3), receipts / CSF / MRZ (M3–M4).
+  per-bank parsers, the Selva VLM lane (M3), receipts / MRZ (M3–M4). See
+  [ROADMAP.md](./ROADMAP.md).
 
 Error codes are closed and a limit is never a partial answer: `unsupported_mime`,
-`unreadable_pdf`, `too_many_pages`, `needs_ocr`; and for the letterhead lane
+`unreadable_pdf`, `too_many_pages`, `needs_ocr`; for the letterhead and csf lanes
 `unreadable_image`, `image_too_large`, `unreadable_scan`, `ocr_unavailable`,
-`ocr_timeout`, `ocr_busy`, `ocr_failed`.
+`ocr_timeout`, `ocr_busy`, `ocr_failed`; for the csf lane `not_a_csf` and
+`invalid_reader`.
 
 ## Production status: landing live, api and worker not launched yet
 

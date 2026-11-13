@@ -144,7 +144,11 @@ def lines_from_tsv(tsv: str, page: int, kx: float = 1.0, ky: float = 1.0) -> lis
     return [Line(page, sorted(words, key=lambda w: w.x0)) for words in rows]
 
 
-def _recognise(image: Image.Image, deadline: float, dpi: int | None = None) -> str:
+def _recognise(
+    image: Image.Image, deadline: float, dpi: int | None = None, *, psm: int = 3, config: tuple[str, ...] = ()
+) -> str:
+    """Tesseract's TSV for one image. `psm` and `config` (`-c key=value` pairs) let the
+    csf lane (`engines/scan.py`) tune the run; the letterhead lane uses the defaults."""
     binary = tesseract_path()
     if binary is None:
         raise OcrError("ocr_unavailable", status=503, reason="engine_missing")
@@ -153,9 +157,11 @@ def _recognise(image: Image.Image, deadline: float, dpi: int | None = None) -> s
         raise OcrError("ocr_timeout", limit_seconds=BUDGET_SECONDS)
     buf = io.BytesIO()
     image.save(buf, "PNG", compress_level=1)
-    cmd = [binary, "stdin", "stdout", "-l", LANG, "--psm", "3"]
+    cmd = [binary, "stdin", "stdout", "-l", LANG, "--psm", str(psm)]
     if dpi:
         cmd += ["--dpi", str(dpi)]
+    for item in config:
+        cmd += ["-c", item]
     try:
         proc = subprocess.run(
             [*cmd, "tsv"], input=buf.getvalue(), capture_output=True, timeout=remaining, env=_env(), check=False
