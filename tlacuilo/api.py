@@ -6,7 +6,10 @@ the worker and hands the result back once (callback and/or a single GET).
 
 The form field `document_type` (the closed `DocumentType` enum) names what the caller
 is sending. `letterhead_document` selects the letterhead lane — who issued the document
-and when, rules only; every other value, and no value, keeps the statement lane."""
+and when, rules only; `csf` selects the csf lane — a Constancia de Situación Fiscal field
+by field, with OCR for scans and photos; every other value, and no value, keeps the
+statement lane. The form field `reader` (`auto` | `ocr`, csf lane only) asks for OCR even
+when the PDF has a text layer: a second reading of what the text layer did not yield."""
 
 from __future__ import annotations
 
@@ -24,7 +27,7 @@ from .auth import Principal, require_principal
 from .contract import DocumentType, Sensitivity
 from .logging import configure_logging
 from .metrics import EXTRACTIONS
-from .pipeline import ExtractionError, engines_available, run_extraction
+from .pipeline import READERS, ExtractionError, engines_available, run_extraction
 from .settings import get_settings
 
 log = logging.getLogger(__name__)
@@ -102,6 +105,7 @@ async def create_extraction(
     file: UploadFile | None = File(default=None),
     mode: str = Form(default="sync"),
     document_type: str | None = Form(default=None),
+    reader: str = Form(default="auto"),
     source_url: str | None = Form(default=None),
     callback_url: str | None = Form(default=None),
 ):
@@ -112,6 +116,8 @@ async def create_extraction(
             hint = DocumentType(document_type)
         except ValueError:
             raise HTTPException(status_code=400, detail={"error": "invalid_document_type"}) from None
+    if reader not in READERS or (reader != "auto" and hint is not DocumentType.csf):
+        raise HTTPException(status_code=400, detail={"error": "invalid_reader", "allowed": list(READERS)})
 
     if mode == "sync":
         if file is None:
@@ -132,10 +138,10 @@ async def create_extraction(
                 size_bytes=len(data),
             )
             try:
-                if hint is DocumentType.letterhead_document:
+                if hint in (DocumentType.letterhead_document, DocumentType.csf):
                     # OCR can take seconds: off the event loop, so probes keep answering.
                     result = await run_in_threadpool(
-                        run_extraction, data, file.content_type or "", sensitivity, doc_type_hint=hint
+                        run_extraction, data, file.content_type or "", sensitivity, doc_type_hint=hint, reader=reader
                     )
                 else:
                     result = run_extraction(

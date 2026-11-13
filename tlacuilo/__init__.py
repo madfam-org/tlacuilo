@@ -5,4 +5,4 @@ results carry per-field confidence and provenance, and every model call goes thr
 Selva with the caller's sensitivity label. See AGENTS.md for the four doctrines.
 """
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"

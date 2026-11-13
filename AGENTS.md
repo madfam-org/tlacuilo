@@ -63,9 +63,10 @@ service owns *extractions*, not *documents*.
 - `tlacuilo/api.py` — FastAPI: `/health`, `/ready`, `/metrics`, `POST /v1/extractions`
   (sync multipart | async presigned URL), `GET /v1/extractions/{id}`. The form field
   `document_type` (closed enum) names what the caller sends; `letterhead_document`
-  selects the letterhead lane, anything else and nothing keep the statement lane.
-- `tlacuilo/pipeline.py` — one job end to end; raises `ExtractionError` with a code. Two
-  lanes that share no parser: statements (the default) and `_run_letterhead`.
+  selects the letterhead lane, `csf` the csf lane, anything else and nothing keep the
+  statement lane. `reader` (`auto` | `ocr`) is the csf lane's only option.
+- `tlacuilo/pipeline.py` — one job end to end; raises `ExtractionError` with a code. Three
+  lanes that share no parser: statements (the default), `_run_letterhead` and `_run_csf`.
 - `tlacuilo/engines/text_layer.py` — pdfplumber words → lines with boxes.
 - `tlacuilo/engines/ocr.py` — OCR **for the letterhead lane only** (RFC 0040 amendment 1):
   the image's Tesseract binary over stdin/stdout (Spanish, CPU, one job at a time),
@@ -74,24 +75,42 @@ service owns *extractions*, not *documents*.
   says so); the pixel cap and the wall-clock budget are error codes, as is every other
   failure (`image_too_large`, `ocr_timeout`, `ocr_busy`, `ocr_unavailable`, `ocr_failed`,
   `unreadable_image`, `unreadable_scan`). Statement scans are still M1 (`needs_ocr`).
+- `tlacuilo/engines/scan.py` — OCR for the **csf lane** (RFC 0040 amendment 2): pages are
+  prepared before Tesseract reads them (EXIF and OSD orientation, contrast, skew by
+  projection profile, enlargement of small photos, median filter when noisy, flattening
+  of uneven light on a weak page), words come back in the upright reading frame and
+  `to_upload` maps boxes back to the upload's units; QR codes are decoded with zxing-cpp
+  (never fetched); HEIC/HEIF via pi-heif. Same slot, binary and error codes as `ocr.py`;
+  at most 4 pages and 60 s per document.
 - `tlacuilo/parsers/` — `common.py` (Mexican amounts and dates), `registry.py` (bank
   fingerprints; M1 adds `mx.<bank>.<product>.v<n>` parsers), `generic_statement.py`
   (header columns, running balance, sign inference), `letterhead.py` (who issued a
   document and when: institution, professional, document date — **rules only, never a
   model call, never the gateway**; closed keyword lists and a confidence table in its
   docstring; a licence number, an address or a contact detail is never returned).
+- `tlacuilo/parsers/csf.py` (+ `csf_layout.py`, `csf_tables.py`) — a Constancia de
+  Situación Fiscal by **region, not line order** (labels found by position, fuzzy only
+  for OCR and only when the colon is there; values from the label's row and column;
+  tables by header columns); confidence table in its docstring; QR and seal cross-checks;
+  **rules only**, nothing corrected or defaulted. Never imports Karafiel code: the field
+  list is the SAT's, named neutrally.
+- `tlacuilo/csf_contract.py` — the `csf` block of the contract (amendment 2).
 - `tlacuilo/validate.py` — opening + Σ rows = closing, the only auto-commit signal.
 - `tlacuilo/contract.py` — the pydantic models; `contracts/document-extraction.v1.json`
   is generated from them (`python -m tlacuilo.cli schema`) and CI fails on drift. The
   ecosystem's published copy must stay byte-identical. Changes are additive within v1:
-  the `issuer` block is serialised only on letterhead results, so every other result
-  keeps exactly the keys it had (`tests/test_contract.py` pins the bytes).
+  the `issuer` block is serialised only on letterhead results and the `csf` block only on
+  csf results, so every other result keeps exactly the keys it had
+  (`tests/test_contract.py` pins the bytes).
 - `tlacuilo/worker.py` — Celery on the shared queue, one-shot result store, HMAC callback.
   `tlacuilo/db.py` — the jobs table (created at startup in M0; Alembic arrives with M1).
 - `tests/synth.py` — synthetic statements with ground truth; the accuracy harness seed.
   `tests/synth_letter.py` — synthetic letters (text PDF, scan, scanned PDF) with ground
-  truth. Fixtures are invented and say so: never a real institution, person, licence
-  number or address.
+  truth. `tests/synth_csf.py` — synthetic constancias (PF RESICO, PF with an ended
+  régimen, PM régimen general; three pages shaped like a real one, interleaved header,
+  QR code, seal) and named degradation levels; `tests/csf_accuracy.py` scores them per
+  field (`python -m tests.csf_accuracy`). Fixtures are invented and say so: never a real
+  institution, person, licence number, RFC or address — and never a real constancia.
 - `web/` — the landing (static HTML, Caddy, non-root, `/health`).
 - `infra/k8s/production/` — Deployments (api, worker, web), Services, NetworkPolicies,
   the ExternalSecret for queue and gateway credentials, ServiceMonitor, PrometheusRule.
