@@ -1,8 +1,10 @@
 # syntax=docker/dockerfile:1.7
 # tlacuilo — API and worker share this image (the worker runs `celery` from it).
-# CPU-only by design (RFC 0040 M0–M2). Tesseract + Spanish data (`spa`) are called
-# by the letterhead lane only (tlacuilo/engines/ocr.py, at most two pages); M1's
-# statement scan lane will need no image change.
+# CPU-only by design (RFC 0040 M0–M2). Tesseract + Spanish data (`spa`) and the
+# orientation data (`osd`, a dependency of the package) are called by the letterhead
+# lane (tlacuilo/engines/ocr.py) and the csf lane (tlacuilo/engines/scan.py); QR codes
+# (zxing-cpp) and HEIC photos (pi-heif) need no system package. M1's statement scan
+# lane will need no image change.
 FROM python:3.12-slim AS runtime
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1
 RUN apt-get update \

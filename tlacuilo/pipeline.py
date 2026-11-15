@@ -29,9 +29,10 @@ from .contract import (
     Statement,
     Validation,
 )
-from .engines import ocr, text_layer
+from .csf_contract import CsfPageQuality
+from .engines import ocr, scan, text_layer
 from .metrics import DURATION, EXTRACTIONS, PAGES, VALIDATION
-from .parsers import letterhead
+from .parsers import csf, letterhead
 from .parsers.generic_statement import header_columns, parse_statement, to_contract_rows
 from .parsers.registry import fingerprint, parser_id
 from .settings import get_settings
@@ -41,6 +42,8 @@ log = logging.getLogger(__name__)
 PDF = "application/pdf"
 IMAGES = {"image/png", "image/jpeg", "image/webp", "image/tiff"}
 LETTERHEAD_MIMES = (PDF, *ocr.IMAGE_FORMATS)  # the closed list the letterhead lane accepts
+CSF_MIMES = (PDF, *scan.IMAGE_FORMATS)  # the csf lane: PDF, PNG, JPEG, and HEIC/HEIF when decodable
+READERS = ("auto", "ocr")  # csf lane: text layer when there is one (auto), or OCR regardless
 
 
 class ExtractionError(Exception):
@@ -66,12 +69,15 @@ def run_extraction(
     *,
     max_pages: int | None = None,
     doc_type_hint: DocumentType | None = None,
+    reader: str = "auto",
 ) -> ExtractionResult:
     started = time.perf_counter()
     sha = hashlib.sha256(data).hexdigest()
     mime = (mime_type or "").split(";")[0].strip().lower()
     if doc_type_hint is DocumentType.letterhead_document:
         return _run_letterhead(data, mime, sensitivity, sha=sha, started=started)
+    if doc_type_hint is DocumentType.csf:
+        return _run_csf(data, mime, sensitivity, sha=sha, started=started, reader=reader)
     if mime in IMAGES:
         raise ExtractionError("needs_ocr", engines=engines_available(), note="image inputs arrive with the M1 OCR lane")
     if mime != PDF:
@@ -221,6 +227,118 @@ def _run_letterhead(data: bytes, mime: str, sensitivity: Sensitivity, *, sha: st
             durationMs=duration_ms,
         ),
         issuer=Issuer(**letterhead.to_contract(draft)),
+        validation=Validation(balanceReconciles=None, unparsedLines=0, warnings=warnings),
+    )
+
+
+def _run_csf(
+    data: bytes, mime: str, sensitivity: Sensitivity, *, sha: str, started: float, reader: str = "auto"
+) -> ExtractionResult:
+    """The csf lane: a Constancia de Situación Fiscal, field by field, by rules.
+
+    Text layer when the PDF has a real one; OCR (prepared pages, `engines/scan.py`) for a
+    scan, a photo, a PDF that is a picture under a scanner app's invisible text, or when
+    the caller asks for a second reading (`reader=ocr`). The QR code is decoded either
+    way and never fetched. No model and no gateway, at any sensitivity. At most
+    `csf.PAGES` pages are read; a longer document says so."""
+    if mime not in CSF_MIMES:
+        raise ExtractionError("unsupported_mime", mime=mime, allowed=list(CSF_MIMES))
+    if reader not in READERS:
+        raise ExtractionError("invalid_reader", status=400, allowed=list(READERS))
+    qr_texts: list[tuple[int, str, list[float] | None]] = []
+    quality: list[CsfPageQuality] = []
+    try:
+        if mime == PDF:
+            try:
+                total = text_layer.page_count(data)
+                pages = text_layer.extract_pages(data, limit=csf.PAGES)
+                pictured = text_layer.full_page_images(data, csf.PAGES)
+            except Exception as exc:  # corrupt or encrypted PDF
+                log.info("pdf unreadable: %s", type(exc).__name__)
+                raise ExtractionError("unreadable_pdf", reason=type(exc).__name__) from None
+            if total < 1:
+                raise ExtractionError("unreadable_pdf", reason="no_pages")
+            used_ocr = reader == "ocr" or pictured or not text_layer.has_text_layer(pages)
+            if used_ocr:
+                scanned = scan.scan_pdf(data, csf.PAGES)
+            else:
+                found = scan.qr_from_pdf(data, csf.PAGES)
+                qr_texts = [(n, h.text, list(h.bbox)) for n, hits in found.items() for h in hits]
+                quality = [CsfPageQuality(page=p.number, qrFound=p.number in found) for p in pages]
+        else:
+            total, used_ocr = 1, True
+            scanned = scan.scan_image(data, mime)
+    except ocr.OcrError as exc:
+        raise ExtractionError(exc.code, status=exc.status, **exc.extra) from None
+    if used_ocr:
+        pages = [sp.page for sp in scanned]
+        qr_texts = [(sp.page.number, h.text, list(h.bbox)) for sp in scanned for h in sp.qr]
+        quality = [
+            CsfPageQuality(
+                page=sp.page.number,
+                meanWordConfidence=round(sp.mean_conf, 3) if sp.mean_conf is not None else None,
+                rotated=sp.adjustments.rotated,
+                deskew=sp.adjustments.deskew,
+                upscale=sp.adjustments.upscale,
+                contrast=sp.adjustments.contrast,
+                denoised=sp.adjustments.denoised,
+                qrFound=bool(sp.qr),
+            )
+            for sp in scanned
+        ]
+    words = sum(len(line.words) for page in pages for line in page.lines)
+    if used_ocr and words == 0 and not qr_texts:  # a blank or illegible scan is an error, not an empty result
+        raise ExtractionError("unreadable_scan", pages=len(pages))
+    PAGES.labels(engine="ocr" if used_ocr else "text").inc(len(pages))
+
+    block = csf.read_csf(pages, qr_texts, ocr=used_ocr, page_quality=quality)
+    if used_ocr:  # boxes were read upright and level; return them where they are on the upload
+        block = csf.remap_boxes(block, {sp.page.number: sp.to_upload for sp in scanned})
+    read = sum(1 for name in type(block.fields).model_fields if getattr(block.fields, name).value)
+    if not (csf.is_csf(pages) or block.qr.satHost or read >= 3):
+        raise ExtractionError("not_a_csf", pages=len(pages))
+    warnings = []
+    if used_ocr:
+        warnings.append("text read by OCR: confirm every value against the document")
+    if total > len(pages):
+        warnings.append(f"only the first {len(pages)} of {total} pages were read")
+    if block.quality.verdict != "good":
+        warnings.append(f"reading quality is {block.quality.verdict}: capture the unread fields by hand")
+
+    duration_ms = int((time.perf_counter() - started) * 1000)
+    DURATION.observe(duration_ms / 1000)
+    EXTRACTIONS.labels(doc_type=DocumentType.csf.value, outcome="ok").inc()
+    log.info(
+        "extraction ok type=%s pages=%d source=%s fields=%d low=%d unread=%d qr=%s verdict=%s ms=%d",
+        DocumentType.csf.value,
+        total,
+        "ocr" if used_ocr else "text",
+        read,
+        len(block.quality.lowConfidenceFields),
+        len(block.quality.unreadFields),
+        block.qr.status,
+        block.quality.verdict,
+        duration_ms,
+    )
+    engines = Engines(ocr=scan.engine_label(rasterised=mime == PDF)) if used_ocr else Engines(text=text_layer.ENGINE)
+    return ExtractionResult(
+        document=DocumentInfo(
+            type=DocumentType.csf,
+            mimeType=mime,
+            pages=total,
+            language="es",
+            sha256=sha,
+            sizeBytes=len(data),
+            classification=sensitivity,
+        ),
+        provenance=Provenance(
+            version=__version__,
+            engines=engines,
+            parser=csf.PARSER_ID,
+            fingerprintConfidence=0.0,
+            durationMs=duration_ms,
+        ),
+        csf=block,
         validation=Validation(balanceReconciles=None, unparsedLines=0, warnings=warnings),
     )
 

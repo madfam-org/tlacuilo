@@ -96,6 +96,10 @@ jobs:
           docker run --rm $H --tmpfs /tmp tlacuilo:ci python -c "import tlacuilo, tlacuilo.api; print('import ok', tlacuilo.__version__)"
           docker run --rm $H --tmpfs /tmp tlacuilo:ci tesseract --version | head -1
           docker run --rm $H --tmpfs /tmp tlacuilo:ci tesseract --list-langs | grep -x spa
+          # The csf lane also asks Tesseract which way up a page is (osd), decodes QR
+          # codes (zxing-cpp) and opens HEIC photos (pi-heif): all present in the image.
+          docker run --rm $H --tmpfs /tmp tlacuilo:ci tesseract --list-langs | grep -x osd
+          docker run --rm $H --tmpfs /tmp tlacuilo:ci python -c "import zxingcpp; from tlacuilo.engines import scan; assert scan.HEIF and 'image/heic' in scan.IMAGE_FORMATS; print('csf engines ok')"
           # The letterhead lane's OCR, end to end, under the same restrictions: an
           # invented word drawn in memory, read back through stdin and stdout.
           docker run --rm $H --tmpfs /tmp tlacuilo:ci python -c "

@@ -8,7 +8,12 @@ result to review, never a stub.
 Amendment 1 (additive, still v1): the `letterhead_document` type and the optional
 `issuer` block — who issued a document that is not a statement, and its date. The block
 is present only on results of that lane; every other result serialises exactly as
-before, key for key."""
+before, key for key.
+
+Amendment 2 (additive, still v1): the optional `csf` block — what a Constancia de
+Situación Fiscal says, field by field, each with its status, confidence, source, page
+and box, plus the document's QR code and seal as cross-checks and a `quality` verdict.
+Present only on results of the csf lane (`csf_contract.py`)."""
 
 from __future__ import annotations
 
@@ -20,6 +25,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, model_serializer
 
 from . import __version__
+from .csf_contract import Csf
 
 CONTRACT_ID = "document-extraction/v1"
 SCHEMA_ID = "https://github.com/madfam-org/internal-devops/blob/main/ecosystem/contracts/document-extraction.v1.json"
@@ -154,16 +160,19 @@ class ExtractionResult(_Model):
     issuer: Issuer | None = Field(
         default=None, description="Present only on letterhead_document results; the key is absent otherwise"
     )
+    csf: Csf | None = Field(default=None, description="Present only on csf results; the key is absent otherwise")
     validation: Validation
     fields: dict[str, Any] = Field(default_factory=dict)
 
     @model_serializer(mode="wrap")
-    def _issuer_only_when_present(self, handler):
+    def _lane_blocks_only_when_present(self, handler):
         # Results of every other lane keep the exact keys they had before the issuer
-        # block existed, so a consumer validating against an older copy is unaffected.
+        # and csf blocks existed, so a consumer validating against an older copy is
+        # unaffected.
         data = handler(self)
-        if self.issuer is None:
-            data.pop("issuer", None)
+        for key in ("issuer", "csf"):
+            if getattr(self, key) is None:
+                data.pop(key, None)
         return data
 
 

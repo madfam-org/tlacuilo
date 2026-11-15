@@ -1,5 +1,992 @@
 {
   "$defs": {
+    "Csf": {
+      "additionalProperties": false,
+      "properties": {
+        "economicActivities": {
+          "items": {
+            "$ref": "#/$defs/CsfActivity"
+          },
+          "title": "Economicactivities",
+          "type": "array"
+        },
+        "economicActivitiesStatus": {
+          "$ref": "#/$defs/CsfTableStatus"
+        },
+        "fields": {
+          "$ref": "#/$defs/CsfFields"
+        },
+        "legalForm": {
+          "$ref": "#/$defs/CsfLegalForm"
+        },
+        "obligations": {
+          "items": {
+            "$ref": "#/$defs/CsfObligation"
+          },
+          "title": "Obligations",
+          "type": "array"
+        },
+        "obligationsStatus": {
+          "$ref": "#/$defs/CsfTableStatus"
+        },
+        "qr": {
+          "$ref": "#/$defs/CsfQr"
+        },
+        "quality": {
+          "$ref": "#/$defs/CsfQuality"
+        },
+        "regimenes": {
+          "items": {
+            "$ref": "#/$defs/CsfRegimen"
+          },
+          "title": "Regimenes",
+          "type": "array"
+        },
+        "regimenesStatus": {
+          "$ref": "#/$defs/CsfTableStatus"
+        },
+        "seal": {
+          "$ref": "#/$defs/CsfSeal"
+        }
+      },
+      "required": [
+        "legalForm",
+        "fields",
+        "regimenesStatus",
+        "economicActivitiesStatus",
+        "obligationsStatus",
+        "qr",
+        "seal",
+        "quality"
+      ],
+      "title": "Csf",
+      "type": "object"
+    },
+    "CsfActivity": {
+      "additionalProperties": false,
+      "properties": {
+        "bbox": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "number"
+              },
+              "maxItems": 4,
+              "minItems": 4,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "x0, top, x1, bottom from the top-left corner: PDF points for a PDF, pixels of the image as displayed",
+          "title": "Bbox"
+        },
+        "checks": {
+          "items": {
+            "$ref": "#/$defs/CsfCheck"
+          },
+          "title": "Checks",
+          "type": "array"
+        },
+        "confidence": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "endDate": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Enddate"
+        },
+        "lowConfidence": {
+          "title": "Lowconfidence",
+          "type": "boolean"
+        },
+        "name": {
+          "maxLength": 300,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "order": {
+          "anyOf": [
+            {
+              "maximum": 999,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Order"
+        },
+        "page": {
+          "minimum": 1,
+          "title": "Page",
+          "type": "integer"
+        },
+        "percentage": {
+          "anyOf": [
+            {
+              "maximum": 100,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Percentage"
+        },
+        "startDate": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Startdate"
+        }
+      },
+      "required": [
+        "confidence",
+        "lowConfidence",
+        "page",
+        "name"
+      ],
+      "title": "CsfActivity",
+      "type": "object"
+    },
+    "CsfCheck": {
+      "enum": [
+        "format_ok",
+        "format_failed",
+        "label_fuzzy",
+        "value_wrapped",
+        "low_word_confidence",
+        "qr_agrees",
+        "qr_disagrees",
+        "seal_agrees",
+        "seal_disagrees"
+      ],
+      "title": "CsfCheck",
+      "type": "string"
+    },
+    "CsfField": {
+      "additionalProperties": false,
+      "properties": {
+        "bbox": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "number"
+              },
+              "maxItems": 4,
+              "minItems": 4,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "x0, top, x1, bottom from the top-left corner: PDF points for a PDF, pixels of the image as displayed",
+          "title": "Bbox"
+        },
+        "checks": {
+          "items": {
+            "$ref": "#/$defs/CsfCheck"
+          },
+          "title": "Checks",
+          "type": "array"
+        },
+        "confidence": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "lowConfidence": {
+          "description": "confidence under 0.6: present it as doubtful",
+          "title": "Lowconfidence",
+          "type": "boolean"
+        },
+        "page": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Page"
+        },
+        "source": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CsfSource"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "status": {
+          "$ref": "#/$defs/CsfFieldStatus"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "maxLength": 300,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "As printed; dates as ISO YYYY-MM-DD; null when blank or not found",
+          "title": "Value"
+        }
+      },
+      "required": [
+        "status",
+        "confidence",
+        "lowConfidence"
+      ],
+      "title": "CsfField",
+      "type": "object"
+    },
+    "CsfFieldStatus": {
+      "enum": [
+        "read",
+        "invalid",
+        "blank",
+        "not_found",
+        "not_applicable"
+      ],
+      "title": "CsfFieldStatus",
+      "type": "string"
+    },
+    "CsfFields": {
+      "additionalProperties": false,
+      "properties": {
+        "andStreet": {
+          "$ref": "#/$defs/CsfField"
+        },
+        "betweenStreet": {
+          "$ref": "#/$defs/CsfField"
+        },
+        "curp": {
+          "$ref": "#/$defs/CsfField"
+        },
+        "emissionDate": {
+          "$ref": "#/$defs/CsfField",
+          "description": "The date half of «Lugar y Fecha de Emisión», ISO"
+        },
+        "emissionPlace": {
+          "$ref": "#/$defs/CsfField",
+          "description": "The place half of «Lugar y Fecha de Emisión»"
+        },
+        "exteriorNumber": {
+          "$ref": "#/$defs/CsfField"
+        },
+        "firstSurname": {
+          "$ref": "#/$defs/CsfField"
+        },
+        "givenNames": {
+          "$ref": "#/$defs/CsfField"
+        },
+        "idCif": {
+          "$ref": "#/$defs/CsfField"
+        },
+        "interiorNumber": {
+          "$ref": "#/$defs/CsfField"
+        },
+        "lastStatusChangeDate": {
+          "$ref": "#/$defs/CsfField"
+        },
+        "legalName": {
+          "$ref": "#/$defs/CsfField",
+          "description": "Denominación/Razón Social (persona moral)"
+        },
+        "locality": {
+          "$ref": "#/$defs/CsfField"
+        },
+        "municipality": {
+          "$ref": "#/$defs/CsfField"
+        },
+        "neighborhood": {
+          "$ref": "#/$defs/CsfField"
+        },
+        "operationsStartDate": {
+          "$ref": "#/$defs/CsfField"
+        },
+        "padronStatus": {
+          "$ref": "#/$defs/CsfField"
+        },
+        "postalCode": {
+          "$ref": "#/$defs/CsfField"
+        },
+        "regimenCapital": {
+          "$ref": "#/$defs/CsfField"
+        },
+        "rfc": {
+          "$ref": "#/$defs/CsfField"
+        },
+        "secondSurname": {
+          "$ref": "#/$defs/CsfField"
+        },
+        "state": {
+          "$ref": "#/$defs/CsfField"
+        },
+        "streetName": {
+          "$ref": "#/$defs/CsfField"
+        },
+        "streetType": {
+          "$ref": "#/$defs/CsfField"
+        },
+        "tradeName": {
+          "$ref": "#/$defs/CsfField"
+        }
+      },
+      "required": [
+        "rfc",
+        "curp",
+        "legalName",
+        "regimenCapital",
+        "givenNames",
+        "firstSurname",
+        "secondSurname",
+        "idCif",
+        "tradeName",
+        "postalCode",
+        "streetType",
+        "streetName",
+        "exteriorNumber",
+        "interiorNumber",
+        "neighborhood",
+        "locality",
+        "municipality",
+        "state",
+        "betweenStreet",
+        "andStreet",
+        "operationsStartDate",
+        "padronStatus",
+        "lastStatusChangeDate",
+        "emissionPlace",
+        "emissionDate"
+      ],
+      "title": "CsfFields",
+      "type": "object"
+    },
+    "CsfLegalForm": {
+      "additionalProperties": false,
+      "properties": {
+        "confidence": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "value": {
+          "enum": [
+            "persona_fisica",
+            "persona_moral",
+            "unknown"
+          ],
+          "title": "Value",
+          "type": "string"
+        }
+      },
+      "required": [
+        "value",
+        "confidence"
+      ],
+      "title": "CsfLegalForm",
+      "type": "object"
+    },
+    "CsfObligation": {
+      "additionalProperties": false,
+      "properties": {
+        "bbox": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "number"
+              },
+              "maxItems": 4,
+              "minItems": 4,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "x0, top, x1, bottom from the top-left corner: PDF points for a PDF, pixels of the image as displayed",
+          "title": "Bbox"
+        },
+        "checks": {
+          "items": {
+            "$ref": "#/$defs/CsfCheck"
+          },
+          "title": "Checks",
+          "type": "array"
+        },
+        "confidence": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "description": {
+          "maxLength": 400,
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        },
+        "dueRule": {
+          "anyOf": [
+            {
+              "maxLength": 400,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Duerule"
+        },
+        "endDate": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Enddate"
+        },
+        "lowConfidence": {
+          "title": "Lowconfidence",
+          "type": "boolean"
+        },
+        "page": {
+          "minimum": 1,
+          "title": "Page",
+          "type": "integer"
+        },
+        "startDate": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Startdate"
+        }
+      },
+      "required": [
+        "confidence",
+        "lowConfidence",
+        "page",
+        "description"
+      ],
+      "title": "CsfObligation",
+      "type": "object"
+    },
+    "CsfPageQuality": {
+      "additionalProperties": false,
+      "properties": {
+        "contrast": {
+          "default": false,
+          "title": "Contrast",
+          "type": "boolean"
+        },
+        "denoised": {
+          "default": false,
+          "title": "Denoised",
+          "type": "boolean"
+        },
+        "deskew": {
+          "default": 0.0,
+          "description": "Degrees counter-clockwise",
+          "title": "Deskew",
+          "type": "number"
+        },
+        "meanWordConfidence": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "null for a text layer",
+          "title": "Meanwordconfidence"
+        },
+        "page": {
+          "minimum": 1,
+          "title": "Page",
+          "type": "integer"
+        },
+        "qrFound": {
+          "default": false,
+          "title": "Qrfound",
+          "type": "boolean"
+        },
+        "rotated": {
+          "default": 0,
+          "description": "Quarter turns applied, degrees counter-clockwise",
+          "title": "Rotated",
+          "type": "integer"
+        },
+        "upscale": {
+          "default": 1.0,
+          "title": "Upscale",
+          "type": "number"
+        }
+      },
+      "required": [
+        "page"
+      ],
+      "title": "CsfPageQuality",
+      "type": "object"
+    },
+    "CsfQr": {
+      "additionalProperties": false,
+      "properties": {
+        "bbox": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "number"
+              },
+              "maxItems": 4,
+              "minItems": 4,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "x0, top, x1, bottom from the top-left corner: PDF points for a PDF, pixels of the image as displayed",
+          "title": "Bbox"
+        },
+        "confidence": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "idCif": {
+          "anyOf": [
+            {
+              "maxLength": 20,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Idcif"
+        },
+        "page": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Page"
+        },
+        "parameters": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "The URL's query parameters, as encoded",
+          "title": "Parameters",
+          "type": "object"
+        },
+        "rfc": {
+          "anyOf": [
+            {
+              "maxLength": 13,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rfc"
+        },
+        "satHost": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The URL's host is sat.gob.mx or one of its subdomains",
+          "title": "Sathost"
+        },
+        "status": {
+          "enum": [
+            "decoded",
+            "not_found"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "url": {
+          "anyOf": [
+            {
+              "maxLength": 512,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The QR's text. Never fetched by tlacuilo",
+          "title": "Url"
+        }
+      },
+      "required": [
+        "status",
+        "confidence"
+      ],
+      "title": "CsfQr",
+      "type": "object"
+    },
+    "CsfQuality": {
+      "additionalProperties": false,
+      "properties": {
+        "lowConfidenceBelow": {
+          "default": 0.6,
+          "title": "Lowconfidencebelow",
+          "type": "number"
+        },
+        "lowConfidenceFields": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Lowconfidencefields",
+          "type": "array"
+        },
+        "meanWordConfidence": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Meanwordconfidence"
+        },
+        "pages": {
+          "items": {
+            "$ref": "#/$defs/CsfPageQuality"
+          },
+          "title": "Pages",
+          "type": "array"
+        },
+        "pagesRead": {
+          "minimum": 0,
+          "title": "Pagesread",
+          "type": "integer"
+        },
+        "source": {
+          "enum": [
+            "text_layer",
+            "ocr"
+          ],
+          "title": "Source",
+          "type": "string"
+        },
+        "unreadFields": {
+          "description": "Applicable fields not read: capture by hand",
+          "items": {
+            "type": "string"
+          },
+          "title": "Unreadfields",
+          "type": "array"
+        },
+        "verdict": {
+          "description": "good: every field the SAT always fills was read confidently; fair: some were not; poor: most",
+          "enum": [
+            "good",
+            "fair",
+            "poor"
+          ],
+          "title": "Verdict",
+          "type": "string"
+        }
+      },
+      "required": [
+        "verdict",
+        "source",
+        "pagesRead"
+      ],
+      "title": "CsfQuality",
+      "type": "object"
+    },
+    "CsfRegimen": {
+      "additionalProperties": false,
+      "properties": {
+        "bbox": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "number"
+              },
+              "maxItems": 4,
+              "minItems": 4,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "x0, top, x1, bottom from the top-left corner: PDF points for a PDF, pixels of the image as displayed",
+          "title": "Bbox"
+        },
+        "checks": {
+          "items": {
+            "$ref": "#/$defs/CsfCheck"
+          },
+          "title": "Checks",
+          "type": "array"
+        },
+        "confidence": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "endDate": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "null: still in force (or not read; see checks)",
+          "title": "Enddate"
+        },
+        "lowConfidence": {
+          "title": "Lowconfidence",
+          "type": "boolean"
+        },
+        "name": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "page": {
+          "minimum": 1,
+          "title": "Page",
+          "type": "integer"
+        },
+        "startDate": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Startdate"
+        }
+      },
+      "required": [
+        "confidence",
+        "lowConfidence",
+        "page",
+        "name"
+      ],
+      "title": "CsfRegimen",
+      "type": "object"
+    },
+    "CsfSeal": {
+      "additionalProperties": false,
+      "description": "The head of «Cadena Original Sello»: when the SAT generated the document, for whom.",
+      "properties": {
+        "bbox": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "number"
+              },
+              "maxItems": 4,
+              "minItems": 4,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "x0, top, x1, bottom from the top-left corner: PDF points for a PDF, pixels of the image as displayed",
+          "title": "Bbox"
+        },
+        "confidence": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "lowConfidence": {
+          "title": "Lowconfidence",
+          "type": "boolean"
+        },
+        "page": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Page"
+        },
+        "rfc": {
+          "anyOf": [
+            {
+              "maxLength": 13,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rfc"
+        },
+        "source": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CsfSource"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "status": {
+          "enum": [
+            "read",
+            "invalid",
+            "not_found"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "timestamp": {
+          "anyOf": [
+            {
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Local time as printed",
+          "title": "Timestamp"
+        }
+      },
+      "required": [
+        "status",
+        "confidence",
+        "lowConfidence"
+      ],
+      "title": "CsfSeal",
+      "type": "object"
+    },
+    "CsfSource": {
+      "enum": [
+        "text_layer",
+        "ocr",
+        "qr",
+        "seal"
+      ],
+      "title": "CsfSource",
+      "type": "string"
+    },
+    "CsfTableStatus": {
+      "enum": [
+        "read",
+        "not_found",
+        "no_rows"
+      ],
+      "title": "CsfTableStatus",
+      "type": "string"
+    },
     "DocumentInfo": {
       "additionalProperties": false,
       "properties": {
@@ -316,7 +1303,7 @@
           "type": "string"
         },
         "version": {
-          "default": "0.1.0",
+          "default": "0.2.0",
           "title": "Version",
           "type": "string"
         }
@@ -603,6 +1590,18 @@
       "default": "document-extraction/v1",
       "title": "Contract",
       "type": "string"
+    },
+    "csf": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Csf"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Present only on csf results; the key is absent otherwise"
     },
     "document": {
       "$ref": "#/$defs/DocumentInfo"
