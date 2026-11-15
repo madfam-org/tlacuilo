@@ -8,6 +8,7 @@ namespace: tlacuilo
 # - worker-deployment.yaml  SPEC ONLY, NOT WIRED until the full launch (file header).
 # - external-secret.yaml    SPEC ONLY, NOT WIRED until Vault holds secret/tlacuilo.
 resources:
+- api-deployment.yaml
 - service.yaml
 - web-deployment.yaml
 - web-service.yaml
