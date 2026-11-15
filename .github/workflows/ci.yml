@@ -24,7 +24,7 @@ jobs:
       - name: Install
         run: python -m pip install --upgrade pip && python -m pip install -e '.[dev]'
       - name: OCR engine (the same packages the image installs; without it the OCR tests skip)
-        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-spa
+        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-spa tesseract-ocr-eng
       - name: Lint
         run: ruff check .
       - name: Tests
@@ -96,6 +96,8 @@ jobs:
           docker run --rm $H --tmpfs /tmp tlacuilo:ci python -c "import tlacuilo, tlacuilo.api; print('import ok', tlacuilo.__version__)"
           docker run --rm $H --tmpfs /tmp tlacuilo:ci tesseract --version | head -1
           docker run --rm $H --tmpfs /tmp tlacuilo:ci tesseract --list-langs | grep -x spa
+          # The text lane reads Spanish and English together (spa+eng).
+          docker run --rm $H --tmpfs /tmp tlacuilo:ci tesseract --list-langs | grep -x eng
           # The csf lane also asks Tesseract which way up a page is (osd), decodes QR
           # codes (zxing-cpp) and opens HEIC photos (pi-heif): all present in the image.
           docker run --rm $H --tmpfs /tmp tlacuilo:ci tesseract --list-langs | grep -x osd

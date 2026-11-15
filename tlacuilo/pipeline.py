@@ -7,7 +7,10 @@ any type but one, a job takes the statement lane exactly as before. With
 `letterhead_document` it takes the letterhead lane (`_run_letterhead`): who issued the
 document and when, by rules alone, from the text layer or — for a scan or a photo — from
 OCR of at most two pages. The two lanes share no parser: a letter is never read as a
-statement, nor a statement as a letter."""
+statement, nor a statement as a letter.
+
+A third and a fourth lane follow the same rule: `csf` (`_run_csf`) and `text_document`
+(`_run_text`), which returns what a document says line by line and interprets nothing."""
 
 from __future__ import annotations
 
@@ -18,6 +21,8 @@ import time
 
 from . import __version__
 from .contract import (
+    TEXT_LINE_MAX,
+    TEXT_TOTAL_MAX,
     DocumentInfo,
     DocumentType,
     Engines,
@@ -27,6 +32,10 @@ from .contract import (
     Provenance,
     Sensitivity,
     Statement,
+    Text,
+    TextLine,
+    TextPage,
+    TextQuality,
     Validation,
 )
 from .csf_contract import CsfPageQuality
@@ -43,6 +52,10 @@ PDF = "application/pdf"
 IMAGES = {"image/png", "image/jpeg", "image/webp", "image/tiff"}
 LETTERHEAD_MIMES = (PDF, *ocr.IMAGE_FORMATS)  # the closed list the letterhead lane accepts
 CSF_MIMES = (PDF, *scan.IMAGE_FORMATS)  # the csf lane: PDF, PNG, JPEG, and HEIC/HEIF when decodable
+TEXT_MIMES = CSF_MIMES  # the text lane accepts what the scan engine can open
+TEXT_LAYER_PAGES = 10  # pages read from a text layer; OCR reads scan.MAX_PAGES at most
+TEXT_PARSER_ID = "text.lines.v1"
+TEXT_GOOD, TEXT_FAIR = 0.80, 0.60  # mean word confidence of an OCR reading
 READERS = ("auto", "ocr")  # csf lane: text layer when there is one (auto), or OCR regardless
 
 
@@ -78,6 +91,8 @@ def run_extraction(
         return _run_letterhead(data, mime, sensitivity, sha=sha, started=started)
     if doc_type_hint is DocumentType.csf:
         return _run_csf(data, mime, sensitivity, sha=sha, started=started, reader=reader)
+    if doc_type_hint is DocumentType.text_document:
+        return _run_text(data, mime, sensitivity, sha=sha, started=started)
     if mime in IMAGES:
         raise ExtractionError("needs_ocr", engines=engines_available(), note="image inputs arrive with the M1 OCR lane")
     if mime != PDF:
@@ -339,6 +354,137 @@ def _run_csf(
             durationMs=duration_ms,
         ),
         csf=block,
+        validation=Validation(balanceReconciles=None, unparsedLines=0, warnings=warnings),
+    )
+
+
+def _run_text(data: bytes, mime: str, sensitivity: Sensitivity, *, sha: str, started: float) -> ExtractionResult:
+    """The text lane: what a document says, line by line, and nothing about what it means.
+
+    Text layer when the PDF has a real one (at most `TEXT_LAYER_PAGES` pages); OCR with
+    prepared pages (`engines/scan.py`, Spanish and English, at most `scan.MAX_PAGES`) for
+    a scan, a photo, a screenshot or a PDF that is a picture under invisible text. No
+    parser, no model and no gateway, at any sensitivity: a line is returned as read, with
+    its box and, for OCR, its confidence. A longer document says so; so does a result cut
+    at the size limit."""
+    if mime not in TEXT_MIMES:
+        raise ExtractionError("unsupported_mime", mime=mime, allowed=list(TEXT_MIMES))
+    confidences: dict[int, float | None] = {}
+    to_upload: dict = {}
+    try:
+        if mime == PDF:
+            try:
+                total = text_layer.page_count(data)
+                pages = text_layer.extract_pages(data, limit=TEXT_LAYER_PAGES)
+                pictured = text_layer.full_page_images(data, scan.MAX_PAGES)
+            except Exception as exc:  # corrupt or encrypted PDF
+                log.info("pdf unreadable: %s", type(exc).__name__)
+                raise ExtractionError("unreadable_pdf", reason=type(exc).__name__) from None
+            if total < 1:
+                raise ExtractionError("unreadable_pdf", reason="no_pages")
+            used_ocr = pictured or not text_layer.has_text_layer(pages)
+            scanned = scan.scan_pdf(data, scan.MAX_PAGES, lang=ocr.TEXT_LANG) if used_ocr else []
+        else:
+            total, used_ocr = 1, True
+            scanned = scan.scan_image(data, mime, lang=ocr.TEXT_LANG)
+    except ocr.OcrError as exc:
+        raise ExtractionError(exc.code, status=exc.status, **exc.extra) from None
+    if used_ocr:
+        pages = [sp.page for sp in scanned]
+        confidences = {sp.page.number: sp.mean_conf for sp in scanned}
+        to_upload = {sp.page.number: sp.to_upload for sp in scanned}
+    words = sum(len(line.words) for page in pages for line in page.lines)
+    if used_ocr and words == 0:  # a blank or illegible scan is an error, not an empty result
+        raise ExtractionError("unreadable_scan", pages=len(pages))
+    PAGES.labels(engine="ocr" if used_ocr else "text").inc(len(pages))
+
+    out_pages: list[TextPage] = []
+    characters, truncated = 0, False
+    for page in pages:
+        lines: list[TextLine] = []
+        for line in page.lines:
+            text = line.text.strip()
+            if not text:
+                continue
+            if len(text) > TEXT_LINE_MAX:
+                text, truncated = text[:TEXT_LINE_MAX], True
+            if characters + len(text) > TEXT_TOTAL_MAX:
+                truncated = True
+                break
+            characters += len(text)
+            confs = [w.conf for w in line.words if w.conf is not None]
+            box = line.bbox
+            lines.append(
+                TextLine(
+                    text=text,
+                    confidence=round(sum(confs) / len(confs), 3) if used_ocr and confs else None,
+                    # OCR reads upright and level; return the box where it is on the upload.
+                    bbox=to_upload[page.number](box) if used_ocr else box,
+                )
+            )
+        mean = confidences.get(page.number)
+        out_pages.append(
+            TextPage(page=page.number, meanWordConfidence=round(mean, 3) if mean is not None else None, lines=lines)
+        )
+    if used_ocr:
+        all_confs = [w.conf for page in pages for line in page.lines for w in line.words if w.conf is not None]
+        overall = sum(all_confs) / len(all_confs) if all_confs else 0.0
+        verdict = "good" if overall >= TEXT_GOOD else "fair" if overall >= TEXT_FAIR else "poor"
+    else:
+        verdict = "good"
+
+    warnings = []
+    if used_ocr:
+        warnings.append("text read by OCR: confirm it against the document")
+    if total > len(pages):
+        warnings.append(f"only the first {len(pages)} of {total} pages were read")
+    if truncated:
+        warnings.append("the text was cut at the size limit of a result")
+    if used_ocr and verdict != "good":
+        warnings.append(f"reading quality is {verdict}")
+
+    duration_ms = int((time.perf_counter() - started) * 1000)
+    DURATION.observe(duration_ms / 1000)
+    EXTRACTIONS.labels(doc_type=DocumentType.text_document.value, outcome="ok").inc()
+    log.info(
+        "extraction ok type=%s pages=%d source=%s lines=%d chars=%d verdict=%s ms=%d",
+        DocumentType.text_document.value,
+        total,
+        "ocr" if used_ocr else "text",
+        sum(len(p.lines) for p in out_pages),
+        characters,
+        verdict,
+        duration_ms,
+    )
+    engines = (
+        Engines(ocr=scan.engine_label(rasterised=mime == PDF, lang=ocr.TEXT_LANG))
+        if used_ocr
+        else Engines(text=text_layer.ENGINE)
+    )
+    return ExtractionResult(
+        document=DocumentInfo(
+            type=DocumentType.text_document,
+            mimeType=mime,
+            pages=total,
+            language=None,
+            sha256=sha,
+            sizeBytes=len(data),
+            classification=sensitivity,
+        ),
+        provenance=Provenance(
+            version=__version__,
+            engines=engines,
+            parser=TEXT_PARSER_ID,
+            fingerprintConfidence=0.0,
+            durationMs=duration_ms,
+        ),
+        text=Text(
+            source="ocr" if used_ocr else "text_layer",
+            pagesRead=len(out_pages),
+            characters=characters,
+            pages=out_pages,
+            quality=TextQuality(verdict=verdict),
+        ),
         validation=Validation(balanceReconciles=None, unparsedLines=0, warnings=warnings),
     )
 

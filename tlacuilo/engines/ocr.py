@@ -41,6 +41,8 @@ from PIL import Image, ImageOps
 from .text_layer import Line, Page, Word
 
 LANG = "spa"
+TEXT_LANG = "spa+eng"  # the text lane: a job posting is often in English
+LANGS = (LANG, TEXT_LANG)  # the closed list; a language never comes from a request
 MAX_PAGES = 2
 MAX_IMAGE_PIXELS = 64_000_000  # an uploaded photo, as declared in its header
 WORK_LONG_EDGE = 2600  # pixels Tesseract sees on the long edge, at most
@@ -77,11 +79,11 @@ def _tesseract_version(binary: str) -> str | None:
     return m.group(1) if m else None
 
 
-def engine_label(*, rasterised: bool = False) -> str:
+def engine_label(*, rasterised: bool = False, lang: str = LANG) -> str:
     """What provenance records in `engines.ocr`: names and versions, nothing else."""
     binary = tesseract_path()
     version = _tesseract_version(binary) if binary else None
-    label = f"tesseract {version} ({LANG})" if version else f"tesseract ({LANG})"
+    label = f"tesseract {version} ({lang})" if version else f"tesseract ({lang})"
     if rasterised:
         label += f", raster pypdfium2 {importlib.metadata.version('pypdfium2')}"
     return label
@@ -145,10 +147,20 @@ def lines_from_tsv(tsv: str, page: int, kx: float = 1.0, ky: float = 1.0) -> lis
 
 
 def _recognise(
-    image: Image.Image, deadline: float, dpi: int | None = None, *, psm: int = 3, config: tuple[str, ...] = ()
+    image: Image.Image,
+    deadline: float,
+    dpi: int | None = None,
+    *,
+    psm: int = 3,
+    config: tuple[str, ...] = (),
+    lang: str = LANG,
 ) -> str:
     """Tesseract's TSV for one image. `psm` and `config` (`-c key=value` pairs) let the
-    csf lane (`engines/scan.py`) tune the run; the letterhead lane uses the defaults."""
+    csf lane (`engines/scan.py`) tune the run; the letterhead lane uses the defaults.
+    `lang` is Spanish unless a lane names its own closed value (`TEXT_LANG`, the text
+    lane); it is never taken from a request."""
+    if lang not in LANGS:
+        raise OcrError("ocr_unavailable", status=503, reason="language_not_offered")
     binary = tesseract_path()
     if binary is None:
         raise OcrError("ocr_unavailable", status=503, reason="engine_missing")
@@ -157,7 +169,7 @@ def _recognise(
         raise OcrError("ocr_timeout", limit_seconds=BUDGET_SECONDS)
     buf = io.BytesIO()
     image.save(buf, "PNG", compress_level=1)
-    cmd = [binary, "stdin", "stdout", "-l", LANG, "--psm", str(psm)]
+    cmd = [binary, "stdin", "stdout", "-l", lang, "--psm", str(psm)]
     if dpi:
         cmd += ["--dpi", str(dpi)]
     for item in config:

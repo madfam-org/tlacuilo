@@ -13,7 +13,11 @@ before, key for key.
 Amendment 2 (additive, still v1): the optional `csf` block — what a Constancia de
 Situación Fiscal says, field by field, each with its status, confidence, source, page
 and box, plus the document's QR code and seal as cross-checks and a `quality` verdict.
-Present only on results of the csf lane (`csf_contract.py`)."""
+Present only on results of the csf lane (`csf_contract.py`).
+
+Amendment 3 (additive, still v1): the `text_document` type and the optional `text`
+block — the text of any document, line by line, from the text layer or from OCR. No
+field is interpreted. Present only on results of the text lane."""
 
 from __future__ import annotations
 
@@ -46,6 +50,7 @@ class DocumentType(StrEnum):
     opinion_32d = "opinion_32d"
     id_document = "id_document"
     letterhead_document = "letterhead_document"
+    text_document = "text_document"
     unknown = "unknown"
 
 
@@ -152,6 +157,41 @@ class Issuer(_Model):
     )
 
 
+TEXT_LINE_MAX = 2_000  # characters in one line
+TEXT_TOTAL_MAX = 200_000  # characters in one result
+
+
+class TextLine(_Model):
+    text: str = Field(max_length=TEXT_LINE_MAX, description="The line's words in reading order, single-spaced")
+    confidence: float | None = Field(
+        default=None, ge=0, le=1, description="Mean word confidence from OCR; null for a text layer"
+    )
+    bbox: list[float] | None = Field(default=None, min_length=4, max_length=4, description=_BBOX_NOTE)
+
+
+class TextPage(_Model):
+    page: int = Field(ge=1)
+    meanWordConfidence: float | None = Field(default=None, ge=0, le=1, description="OCR only; null for a text layer")
+    lines: list[TextLine] = Field(default_factory=list)
+
+
+class TextQuality(_Model):
+    verdict: Literal["good", "fair", "poor"] = Field(
+        description="good for a text layer; for OCR, from the mean word confidence (good >= 0.80, fair >= 0.60)"
+    )
+
+
+class Text(_Model):
+    """What a document says, line by line, and nothing about what it means. The lane
+    reads; it never classifies, corrects or completes a line."""
+
+    source: Literal["text_layer", "ocr"]
+    pagesRead: int = Field(ge=0)
+    characters: int = Field(ge=0, le=TEXT_TOTAL_MAX, description="Characters in every returned line, summed")
+    pages: list[TextPage] = Field(default_factory=list)
+    quality: TextQuality
+
+
 class ExtractionResult(_Model):
     contract: Literal["document-extraction/v1"] = CONTRACT_ID
     document: DocumentInfo
@@ -161,16 +201,19 @@ class ExtractionResult(_Model):
         default=None, description="Present only on letterhead_document results; the key is absent otherwise"
     )
     csf: Csf | None = Field(default=None, description="Present only on csf results; the key is absent otherwise")
+    text: Text | None = Field(
+        default=None, description="Present only on text_document results; the key is absent otherwise"
+    )
     validation: Validation
     fields: dict[str, Any] = Field(default_factory=dict)
 
     @model_serializer(mode="wrap")
     def _lane_blocks_only_when_present(self, handler):
-        # Results of every other lane keep the exact keys they had before the issuer
-        # and csf blocks existed, so a consumer validating against an older copy is
+        # Results of every other lane keep the exact keys they had before the issuer,
+        # csf and text blocks existed, so a consumer validating against an older copy is
         # unaffected.
         data = handler(self)
-        for key in ("issuer", "csf"):
+        for key in ("issuer", "csf", "text"):
             if getattr(self, key) is None:
                 data.pop(key, None)
         return data

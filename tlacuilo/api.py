@@ -7,8 +7,10 @@ the worker and hands the result back once (callback and/or a single GET).
 The form field `document_type` (the closed `DocumentType` enum) names what the caller
 is sending. `letterhead_document` selects the letterhead lane — who issued the document
 and when, rules only; `csf` selects the csf lane — a Constancia de Situación Fiscal field
-by field, with OCR for scans and photos; every other value, and no value, keeps the
-statement lane. The form field `reader` (`auto` | `ocr`, csf lane only) asks for OCR even
+by field, with OCR for scans and photos; `text_document` selects the text lane — what
+any document says, line by line, with OCR (Spanish and English) for scans, photos and
+screenshots; every other value, and no value, keeps the statement lane. The form field
+`reader` (`auto` | `ocr`, csf lane only) asks for OCR even
 when the PDF has a text layer: a second reading of what the text layer did not yield."""
 
 from __future__ import annotations
@@ -138,7 +140,7 @@ async def create_extraction(
                 size_bytes=len(data),
             )
             try:
-                if hint in (DocumentType.letterhead_document, DocumentType.csf):
+                if hint in (DocumentType.letterhead_document, DocumentType.csf, DocumentType.text_document):
                     # OCR can take seconds: off the event loop, so probes keep answering.
                     result = await run_in_threadpool(
                         run_extraction, data, file.content_type or "", sensitivity, doc_type_hint=hint, reader=reader

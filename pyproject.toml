@@ -1,6 +1,6 @@
 [project]
 name = "tlacuilo"
-version = "0.2.0"
+version = "0.3.0"
 description = "tlacuilo — MADFAM document-intelligence service: OCR + typed extraction, nothing durable (RFC 0040)"
 readme = "README.md"
 license = "AGPL-3.0-only"

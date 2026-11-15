@@ -38,6 +38,7 @@ spec:
                   - dhanam
                   - karafiel
                   - crea-map
+                  - cv
                   - enclii-dhanam-staging
                   - enclii-karafiel-staging
       ports:
