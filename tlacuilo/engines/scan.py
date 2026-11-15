@@ -311,16 +311,18 @@ def _score(lines: list[Line]) -> float:
     return sum(w.conf for ln in lines for w in ln.words if w.conf is not None and w.conf >= 0.6)
 
 
-def _read(img: Image.Image, number: int, deadline: float, kx: float, ky: float) -> ScannedPage:
+def _read(
+    img: Image.Image, number: int, deadline: float, kx: float, ky: float, lang: str = ocr.LANG
+) -> ScannedPage:
     """Prepare and read. A page that reads weakly is tried again flattened (uneven
     light) and, if still weak, the way OSD says is up; the best reading wins."""
     prepared, back, adj = prepare(img)
     unit = kx / adj.upscale  # page units per prepared pixel (kx ≈ ky: pages are not stretched)
-    lines = _words(ocr._recognise(prepared, deadline, psm=PSM, config=CONFIG), number, unit)
+    lines = _words(ocr._recognise(prepared, deadline, psm=PSM, config=CONFIG, lang=lang), number, unit)
     mean, count = _quality(lines)
     if mean < WEAK_PAGE_CONF or count < WEAK_PAGE_WORDS:
         flat = flatten(prepared)
-        again = _words(ocr._recognise(flat, deadline, psm=PSM, config=CONFIG), number, unit)
+        again = _words(ocr._recognise(flat, deadline, psm=PSM, config=CONFIG, lang=lang), number, unit)
         if _score(again) > _score(lines):
             lines, prepared, adj.contrast = again, flat, True
             mean, count = _quality(lines)
@@ -329,7 +331,7 @@ def _read(img: Image.Image, number: int, deadline: float, kx: float, ky: float) 
         if turn:
             # A quarter turn is exact: no resampling blur, and the boxes map back.
             turned, turned_back = _rotate(prepared, turn, back)
-            again = _words(ocr._recognise(turned, deadline, psm=PSM, config=CONFIG), number, unit)
+            again = _words(ocr._recognise(turned, deadline, psm=PSM, config=CONFIG, lang=lang), number, unit)
             if _score(again) > _score(lines):
                 lines, prepared, back = again, turned, turned_back
                 mean, count = _quality(lines)
@@ -340,7 +342,9 @@ def _read(img: Image.Image, number: int, deadline: float, kx: float, ky: float) 
     return ScannedPage(page, adj, _mapper(back, unit, kx, ky), qr=qr, mean_conf=mean if lines else None)
 
 
-def scan_image(data: bytes, mime: str, *, budget_seconds: float = BUDGET_SECONDS) -> list[ScannedPage]:
+def scan_image(
+    data: bytes, mime: str, *, budget_seconds: float = BUDGET_SECONDS, lang: str = ocr.LANG
+) -> list[ScannedPage]:
     """One uploaded photo or scan as one page; boxes in pixels of the image as displayed."""
     fmt = IMAGE_FORMATS.get(mime)
     if fmt is None:
@@ -366,17 +370,19 @@ def scan_image(data: bytes, mime: str, *, budget_seconds: float = BUDGET_SECONDS
             raise ocr.OcrError("unreadable_image", reason=type(exc).__name__) from None
         if min(img.size) < 1:
             raise ocr.OcrError("unreadable_image", reason="empty")
-        return [_read(img, 1, deadline, 1.0, 1.0)]
+        return [_read(img, 1, deadline, 1.0, 1.0, lang)]
 
 
-def scan_pdf(data: bytes, limit: int = MAX_PAGES, *, budget_seconds: float = BUDGET_SECONDS) -> list[ScannedPage]:
+def scan_pdf(
+    data: bytes, limit: int = MAX_PAGES, *, budget_seconds: float = BUDGET_SECONDS, lang: str = ocr.LANG
+) -> list[ScannedPage]:
     """The first `limit` (at most MAX_PAGES) pages of a PDF, rasterised and read;
     boxes in PDF points."""
     deadline = time.monotonic() + budget_seconds
     out: list[ScannedPage] = []
     with ocr._one_job(deadline):
         for number, image, kx, ky in _render(data, limit):
-            out.append(_read(image, number, deadline, kx, ky))
+            out.append(_read(image, number, deadline, kx, ky, lang))
     return out
 
 
@@ -424,6 +430,6 @@ def page_count(data: bytes) -> int:
         pdf.close()
 
 
-def engine_label(*, rasterised: bool = False) -> str:
-    label = ocr.engine_label(rasterised=rasterised)
+def engine_label(*, rasterised: bool = False, lang: str = ocr.LANG) -> str:
+    label = ocr.engine_label(rasterised=rasterised, lang=lang)
     return label + ", prepared (contrast, skew, size, noise), qr zxing-cpp"

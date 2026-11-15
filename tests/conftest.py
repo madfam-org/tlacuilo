@@ -32,10 +32,26 @@ def _spanish_ocr_installed() -> bool:
     return b"spa" in (listed.stdout + listed.stderr).split()
 
 
+def _english_ocr_installed() -> bool:
+    binary = shutil.which("tesseract")
+    if binary is None:
+        return False
+    try:
+        listed = subprocess.run([binary, "--list-langs"], capture_output=True, timeout=10, check=False)
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return b"eng" in (listed.stdout + listed.stderr).split()
+
+
 # The image ships Tesseract with Spanish data and CI installs the same packages, so the
 # OCR path runs there; a bare machine skips these tests instead of failing them.
 needs_ocr_engine = pytest.mark.skipif(
     not _spanish_ocr_installed(), reason="tesseract with Spanish language data is not installed"
+)
+# The text lane reads Spanish and English together (`spa+eng`).
+needs_text_ocr_engine = pytest.mark.skipif(
+    not (_spanish_ocr_installed() and _english_ocr_installed()),
+    reason="tesseract with Spanish and English language data is not installed",
 )
 
 

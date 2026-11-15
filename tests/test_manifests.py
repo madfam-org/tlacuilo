@@ -117,6 +117,7 @@ def test_consumer_ingress_admits_a_closed_list_of_namespaces_and_only_the_api_po
     assert (expr["key"], expr["operator"]) == ("kubernetes.io/metadata.name", "In")
     assert sorted(expr["values"]) == [
         "crea-map",
+        "cv",
         "dhanam",
         "enclii-dhanam-staging",
         "enclii-karafiel-staging",

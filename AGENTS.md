@@ -63,10 +63,15 @@ service owns *extractions*, not *documents*.
 - `tlacuilo/api.py` — FastAPI: `/health`, `/ready`, `/metrics`, `POST /v1/extractions`
   (sync multipart | async presigned URL), `GET /v1/extractions/{id}`. The form field
   `document_type` (closed enum) names what the caller sends; `letterhead_document`
-  selects the letterhead lane, `csf` the csf lane, anything else and nothing keep the
-  statement lane. `reader` (`auto` | `ocr`) is the csf lane's only option.
-- `tlacuilo/pipeline.py` — one job end to end; raises `ExtractionError` with a code. Three
-  lanes that share no parser: statements (the default), `_run_letterhead` and `_run_csf`.
+  selects the letterhead lane, `csf` the csf lane, `text_document` the text lane, anything
+  else and nothing keep the statement lane. `reader` (`auto` | `ocr`) is the csf lane's only option.
+- `tlacuilo/pipeline.py` — one job end to end; raises `ExtractionError` with a code. Four
+  lanes that share no parser: statements (the default), `_run_letterhead`, `_run_csf` and
+  `_run_text` (RFC 0040 amendment 3, 2026-11-14: the `text` block — a document's lines as
+  read, with boxes and, for OCR, confidences; ten pages from a text layer, four by OCR in
+  Spanish and English, `ocr.TEXT_LANG`; no parser, no model, nothing interpreted;
+  `tests/synth_posting.py`, `tests/test_text_lane.py`). An OCR language is a closed value
+  a lane names (`ocr.LANGS`), never a request field.
 - `tlacuilo/engines/text_layer.py` — pdfplumber words → lines with boxes.
 - `tlacuilo/engines/ocr.py` — OCR **for the letterhead lane only** (RFC 0040 amendment 1):
   the image's Tesseract binary over stdin/stdout (Spanish, CPU, one job at a time),

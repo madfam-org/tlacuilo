@@ -114,12 +114,19 @@ every call carries a Janua RS256 service token with the role `tlacuilo:extract` 
   preparation, the QR code and seal as cross-checks (`tlacuilo/parsers/csf*.py`,
   `tlacuilo/engines/scan.py`, `tlacuilo/csf_contract.py`) and a synthetic corpus with
   degradations (`tests/synth_csf.py`, `tests/csf_accuracy.py`).
+- The text lane (RFC 0040 amendment 3, pending its record in internal-devops):
+  `document_type=text_document` returns a `text` block — what a document says, line by
+  line (`source` `text_layer` | `ocr`, `pagesRead`, `characters`, `pages[].lines[]` with
+  `text`, `confidence` and `bbox`, and `quality.verdict`). A text-layer PDF is read up to
+  ten pages; a scan, a photo or a screenshot (PDF, PNG, JPEG, HEIC) is read by OCR in
+  Spanish and English, at most four pages. Nothing is interpreted, corrected or completed;
+  a longer document and a result cut at the size limit say so in `validation.warnings`.
 - Not yet: OCR of statement scans (M1 — a scanned statement still answers `needs_ocr`),
   per-bank parsers, the Selva VLM lane (M3), receipts / MRZ (M3–M4). See
   [ROADMAP.md](./ROADMAP.md).
 
 Error codes are closed and a limit is never a partial answer: `unsupported_mime`,
-`unreadable_pdf`, `too_many_pages`, `needs_ocr`; for the letterhead and csf lanes
+`unreadable_pdf`, `too_many_pages`, `needs_ocr`; for the letterhead, csf and text lanes
 `unreadable_image`, `image_too_large`, `unreadable_scan`, `ocr_unavailable`,
 `ocr_timeout`, `ocr_busy`, `ocr_failed`; for the csf lane `not_a_csf` and
 `invalid_reader`.

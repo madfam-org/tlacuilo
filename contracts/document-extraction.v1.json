@@ -1049,6 +1049,7 @@
         "opinion_32d",
         "id_document",
         "letterhead_document",
+        "text_document",
         "unknown"
       ],
       "title": "DocumentType",
@@ -1303,7 +1304,7 @@
           "type": "string"
         },
         "version": {
-          "default": "0.2.0",
+          "default": "0.3.0",
           "title": "Version",
           "type": "string"
         }
@@ -1523,6 +1524,156 @@
       "title": "StatementRow",
       "type": "object"
     },
+    "Text": {
+      "additionalProperties": false,
+      "description": "What a document says, line by line, and nothing about what it means. The lane\nreads; it never classifies, corrects or completes a line.",
+      "properties": {
+        "characters": {
+          "description": "Characters in every returned line, summed",
+          "maximum": 200000,
+          "minimum": 0,
+          "title": "Characters",
+          "type": "integer"
+        },
+        "pages": {
+          "items": {
+            "$ref": "#/$defs/TextPage"
+          },
+          "title": "Pages",
+          "type": "array"
+        },
+        "pagesRead": {
+          "minimum": 0,
+          "title": "Pagesread",
+          "type": "integer"
+        },
+        "quality": {
+          "$ref": "#/$defs/TextQuality"
+        },
+        "source": {
+          "enum": [
+            "text_layer",
+            "ocr"
+          ],
+          "title": "Source",
+          "type": "string"
+        }
+      },
+      "required": [
+        "source",
+        "pagesRead",
+        "characters",
+        "quality"
+      ],
+      "title": "Text",
+      "type": "object"
+    },
+    "TextLine": {
+      "additionalProperties": false,
+      "properties": {
+        "bbox": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "number"
+              },
+              "maxItems": 4,
+              "minItems": 4,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "x0, top, x1, bottom from the top-left corner: PDF points for a PDF, pixels of the image as displayed",
+          "title": "Bbox"
+        },
+        "confidence": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Mean word confidence from OCR; null for a text layer",
+          "title": "Confidence"
+        },
+        "text": {
+          "description": "The line's words in reading order, single-spaced",
+          "maxLength": 2000,
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "title": "TextLine",
+      "type": "object"
+    },
+    "TextPage": {
+      "additionalProperties": false,
+      "properties": {
+        "lines": {
+          "items": {
+            "$ref": "#/$defs/TextLine"
+          },
+          "title": "Lines",
+          "type": "array"
+        },
+        "meanWordConfidence": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "OCR only; null for a text layer",
+          "title": "Meanwordconfidence"
+        },
+        "page": {
+          "minimum": 1,
+          "title": "Page",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "page"
+      ],
+      "title": "TextPage",
+      "type": "object"
+    },
+    "TextQuality": {
+      "additionalProperties": false,
+      "properties": {
+        "verdict": {
+          "description": "good for a text layer; for OCR, from the mean word confidence (good >= 0.80, fair >= 0.60)",
+          "enum": [
+            "good",
+            "fair",
+            "poor"
+          ],
+          "title": "Verdict",
+          "type": "string"
+        }
+      },
+      "required": [
+        "verdict"
+      ],
+      "title": "TextQuality",
+      "type": "object"
+    },
     "Validation": {
       "additionalProperties": false,
       "properties": {
@@ -1636,6 +1787,18 @@
         }
       ],
       "default": null
+    },
+    "text": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Text"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Present only on text_document results; the key is absent otherwise"
     },
     "validation": {
       "$ref": "#/$defs/Validation"

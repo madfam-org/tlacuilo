@@ -8,6 +8,7 @@ A row moves only with the code, tests and docs that make it true.
 | M0 | Scaffold: text-layer PDFs, generic statement parser, contract `document-extraction/v1`, sync + async modes, Janua auth, CI guards, landing | Done (2026-09). API and worker **not running in production** — see below |
 | A1 | Letterhead lane: issuer and date by rules, OCR for it (Tesseract `spa`, two pages) | Done (2026-11-11) |
 | A2 | CSF lane: a Constancia de Situación Fiscal field by field, by region; OCR of scans and photos with page preparation (orientation, contrast, skew, size, noise); QR code (zxing-cpp) and seal as cross-checks; per-field confidence and a quality verdict; synthetic corpus with degradation levels and an accuracy harness | Built (this branch); the amendment is recorded in internal-devops as a follow-up. First consumer: Karafiel's CSF intake (behind its `CSF_OCR_ENABLED` flag) |
+| A3 | Text lane (`document_type=text_document`): what any document says, line by line, from the text layer (ten pages) or by OCR of a scan, a photo or a screenshot (prepared pages, Tesseract `spa+eng`, four pages); nothing is interpreted. Synthetic bilingual posting with ground truth | Built (2026-11-14, this branch, stacked on A2); the amendment is recorded in internal-devops as a follow-up |
 | M1 | Bank statements: per-bank parsers, OCR of statement scans | Not started |
 | M2 | Dhanam integration and battle test (consent text and DPIA gates T4/T5 first) | Not started |
 | M3 | Selva VLM lane (`restricted` routes to a local model or fails); receipts, CFDI PDFs, 32-D | Not started |

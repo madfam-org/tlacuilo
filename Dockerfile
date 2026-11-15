@@ -8,7 +8,7 @@
 FROM python:3.12-slim AS runtime
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1
 RUN apt-get update \
- && apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-spa \
+ && apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-spa tesseract-ocr-eng \
  && rm -rf /var/lib/apt/lists/*
 RUN groupadd -g 1001 tlacuilo && useradd -u 1001 -g 1001 -m -s /usr/sbin/nologin tlacuilo
 WORKDIR /app
