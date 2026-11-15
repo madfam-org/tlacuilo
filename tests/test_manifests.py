@@ -17,7 +17,7 @@ import pathlib
 import yaml
 
 PROD = pathlib.Path(__file__).resolve().parents[1] / "infra" / "k8s" / "production"
-API_LAUNCHED = False  # the sync-only launch flips this line
+API_LAUNCHED = True  # the sync-only launch flipped this line
 QUEUE_LAUNCHED = False  # the full launch (worker and ExternalSecret) flips this one
 API = ("api-deployment.yaml",)
 QUEUE = ("worker-deployment.yaml", "external-secret.yaml")
